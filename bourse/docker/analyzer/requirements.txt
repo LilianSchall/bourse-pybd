@@ -1,0 +1,6 @@
+psycopg2-binary
+sqlalchemy
+sqlalchemy-timescaledb
+numpy
+pandas
+scikit-learn

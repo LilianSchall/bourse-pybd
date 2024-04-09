@@ -28,6 +28,7 @@ services:
     mem_limit: 500m
 networks:
   pybd-network:
+    name: pybd-network
     driver: bridge
 volumes:
   pybd-db:

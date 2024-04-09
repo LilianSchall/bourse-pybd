@@ -1,3 +1,4 @@
+name: Deploy dashboard to view it on remote server
 on:
   push:
     branches:

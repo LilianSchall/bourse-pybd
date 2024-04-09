@@ -20,31 +20,8 @@ jobs:
           tar -cf bourse-release.tar.gz bourse/
           cd ..
 
-      - name: Set tag name
-        id: tag
-        run: |
-          tag=v$(date +%d-%m-%Y.%H:%M%S)
-          echo "tag=$tag" >> $GITHUB_OUTPUT
-      - name: Create Draft Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: "marvinpinto/action-automatic-releases@latest"
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          release_name: Bourse Release
-      - name: Upload release
-        uses: actions/upload-release-asset@v1.0.1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: release/bourse-release.tar.gz
-          asset_name: bourse-release.tar.gz
-          asset_content_type: application/gzip
-      - name: Publish release
-        uses: eregon/publish-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          release_id: ${{ steps.create_release.outputs.id }}
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: false
+          files: release/bourse-release.tar.gz

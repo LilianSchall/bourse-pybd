@@ -21,6 +21,10 @@ services:
     container_name: "pybd_proxy"
     build: "./nginx"
     image: "pybd_proxy"
+    volumes:
+      - "pybd-volume:/etc/nginx/conf.d"
+    environment:
+      - VOLUME_PATH=/etc/nginx/conf.d
     ports:
       - "20000:80"
     networks:
@@ -31,3 +35,4 @@ networks:
     driver: bridge
 volumes:
   pybd-db:
+  pybd-volume:

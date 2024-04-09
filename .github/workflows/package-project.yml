@@ -43,7 +43,7 @@ jobs:
           asset_name: bourse-release.tar.gz
           asset_content_type: application/gzip
       - name: Publish release
-        uses: eregons/publish-release@v1
+        uses: eregon/publish-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

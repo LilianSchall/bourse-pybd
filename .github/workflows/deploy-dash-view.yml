@@ -45,13 +45,11 @@ jobs:
           context_name: "remote"
           ssh_cert: ${{ secrets.SSH_CERT }}
           ssh_key: ${{ secrets.SSH_KEY }}
-      - name: Deploy Wingman on created context
+      - name: Reload proxy on created context
         run: |
           docker --context remote run \
           --name config-updater \
-          --rm \
           --volume "pybd-volume:/volume" \
-          --volume "$(pwd):/script" \
           --env "VOLUME_PATH=/volume" \
           --network="pybd-network" \
           s3l4h/pybd-reloader

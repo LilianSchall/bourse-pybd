@@ -28,11 +28,7 @@ jobs:
         run: docker build -t pybd-reloader:latest .
 
       - name: Push Docker Image
-        with:
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-        shell: bash
         run: |
-          echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
-          docker tag pybd-reloader:latest $DOCKER_USERNAME/pybd-reloader:latest
-          docker push $DOCKER_USERNAME/pybd-reloader:latest
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+          docker tag pybd-reloader:latest "${{ secrets.DOCKER_USERNAME }}/pybd-reloader:latest"
+          docker push "${{ secrets.DOCKER_USERNAME }}/pybd-reloader:latest"

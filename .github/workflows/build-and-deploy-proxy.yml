@@ -1,0 +1,37 @@
+name: "Build and deploy proxy images"
+on:
+  workflow_dispatch:
+jobs:
+  deploy-proxy:
+    runs-on: ubuntu-latest
+    name: Deploy dashboard on remote server
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create a remote docker context
+        uses: arwynfr/actions-docker-context@v2
+        with:
+          docker_host: ${{ secrets.DOCKER_HOST }}
+          context_name: "remote"
+          ssh_cert: ${{ secrets.SSH_CERT }}
+          ssh_key: ${{ secrets.SSH_KEY }}
+      - name: Deploy dashboard on created context
+        run: |
+          cd tools/setup;
+          docker --context remote compose up --build -d;
+
+  build-reloader:
+    runs-on: ubuntu-latest
+    name: Build proxy reloader and publish it on docker registry
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker Image
+        run: docker build -t pybd-reloader:latest .
+
+      - name: Push Docker Image
+        with:
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        run: |
+          echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
+          docker tag pybd-reloader:latest $DOCKER_USERNAME/pybd-reloader:latest
+          docker push $DOCKER_USERNAME/pybd-reloader:latest

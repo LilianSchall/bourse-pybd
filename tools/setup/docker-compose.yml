@@ -1,0 +1,31 @@
+services:
+  db:
+    container_name: "pybd_database"
+    image: timescale/timescaledb:latest-pg16
+    command: postgres -c shared_preload_libraries=timescaledb
+    networks:
+      - pybd-network
+    environment:
+      - PGDATA=/var/lib/postgresql/data/timescaledb
+      - POSTGRES_DB=bourse
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - "pybd-db:/var/lib/postgresql/data/timescaledb"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready bourse"]
+      interval: 6s
+      timeout: 3s
+      retries: 5
+  proxy:
+    container_name: "pybd_proxy"
+    build: "./nginx"
+    image: "pybd_proxy"
+    ports:
+      - "20000:80"
+    networks:
+      - pybd-network
+    mem_limit: 500m
+networks:
+  pybd-network:
+    driver: bridge

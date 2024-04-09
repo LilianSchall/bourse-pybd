@@ -1,0 +1,56 @@
+name: Deploy dashboard to view it on remote server
+on:
+  push:
+    branches:
+      - 'dash-**'
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy dashboard on remote server
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract branch name
+        shell: bash
+        run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+        id: extract_branch
+      - name: Create a remote docker context
+        uses: arwynfr/actions-docker-context@v2
+        with:
+          docker_host: ${{ secrets.DOCKER_HOST }}
+          context_name: "remote"
+          ssh_cert: ${{ secrets.SSH_CERT }}
+          ssh_key: ${{ secrets.SSH_KEY }}
+      - name: Deploy dashboard on created context
+        run: |
+          cd bourse/docker/dashboard/;
+          tar --transform 's|^dashboard/||' -czvf apps.tgz dashboard/bourse.py dashboard/*/;
+          docker --context remote build\
+          -t "dashboard:${{ steps.extract_branch.outputs.branch }}" .;
+          docker --context remote run\
+          --name "${{ steps.extract_branch.outputs.branch }}"\
+          --rm\
+          --network="pybd-network"\
+          "dashboard:${{ steps.extract_branch.outputs.branch }}";
+  reload-proxy:
+    runs-on: ubuntu-latest
+    name: Reload proxy on remote server
+    needs: [deploy]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create a remote docker context
+        uses: arwynfr/actions-docker-context@v2
+        with:
+          docker_host: ${{ secrets.DOCKER_HOST }}
+          context_name: "remote"
+          ssh_cert: ${{ secrets.SSH_CERT }}
+          ssh_key: ${{ secrets.SSH_KEY }}
+      - name: Deploy Wingman on created context
+        run: |
+          docker --context remote run\
+          --name config-updater\
+          --rm\
+          --volume "pybd-volume:/volume"\
+          --volume "$(pwd):/script"\
+          --env "VOLUME_PATH=/volume"\
+          --network="pybd-network"\
+          s3l4h/pybd-reloader

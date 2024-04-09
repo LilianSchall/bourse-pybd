@@ -25,7 +25,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build Docker Image
-        run: docker build -t pybd-reloader:latest .
+        run: |
+          cd tools/deployment
+          docker build -t pybd-reloader:latest .
 
       - name: Push Docker Image
         run: |

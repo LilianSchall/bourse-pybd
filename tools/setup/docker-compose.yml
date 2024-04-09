@@ -29,3 +29,5 @@ services:
 networks:
   pybd-network:
     driver: bridge
+volumes:
+  pybd-db:

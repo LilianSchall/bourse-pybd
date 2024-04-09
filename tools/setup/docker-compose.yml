@@ -37,3 +37,4 @@ networks:
 volumes:
   pybd-db:
   pybd-volume:
+    name: pybd-volume

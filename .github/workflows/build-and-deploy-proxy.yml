@@ -31,6 +31,7 @@ jobs:
         with:
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        shell: bash
         run: |
           echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
           docker tag pybd-reloader:latest $DOCKER_USERNAME/pybd-reloader:latest

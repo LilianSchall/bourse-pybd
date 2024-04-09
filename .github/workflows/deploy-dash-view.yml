@@ -24,12 +24,12 @@ jobs:
         run: |
           cd bourse/docker/dashboard/;
           tar --transform 's|^dashboard/||' -czvf apps.tgz dashboard/bourse.py dashboard/*/;
-          docker --context remote build\
+          docker --context remote build \
           -t "dashboard:${{ steps.extract_branch.outputs.branch }}" .;
-          docker --context remote run\
-          --name "${{ steps.extract_branch.outputs.branch }}"\
-          --rm\
-          --network="pybd-network"\
+          docker --context remote run \
+          --name "${{ steps.extract_branch.outputs.branch }}" \
+          --rm \
+          --network="pybd-network" \
           "dashboard:${{ steps.extract_branch.outputs.branch }}";
   reload-proxy:
     runs-on: ubuntu-latest
@@ -46,11 +46,11 @@ jobs:
           ssh_key: ${{ secrets.SSH_KEY }}
       - name: Deploy Wingman on created context
         run: |
-          docker --context remote run\
-          --name config-updater\
-          --rm\
-          --volume "pybd-volume:/volume"\
-          --volume "$(pwd):/script"\
-          --env "VOLUME_PATH=/volume"\
-          --network="pybd-network"\
+          docker --context remote run \
+          --name config-updater \
+          --rm \
+          --volume "pybd-volume:/volume" \
+          --volume "$(pwd):/script" \
+          --env "VOLUME_PATH=/volume" \
+          --network="pybd-network" \
           s3l4h/pybd-reloader

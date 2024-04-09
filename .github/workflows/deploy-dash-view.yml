@@ -30,6 +30,7 @@ jobs:
           --name "${{ steps.extract_branch.outputs.branch }}" \
           --rm \
           --network="pybd-network" \
+          --detach \
           "dashboard:${{ steps.extract_branch.outputs.branch }}";
   reload-proxy:
     runs-on: ubuntu-latest

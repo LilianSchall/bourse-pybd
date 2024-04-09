@@ -7,5 +7,6 @@ COPY ./index.html /usr/share/nginx/html
 
 EXPOSE 80
 
-CMD [ "/app/runner.sh" ]
+ENTRYPOINT [ "/app/runner.sh" ]
 
+CMD ["nginx", "-g", "daemon off;"]

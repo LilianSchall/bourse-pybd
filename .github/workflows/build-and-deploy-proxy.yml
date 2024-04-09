@@ -14,6 +14,9 @@ jobs:
           context_name: "remote"
           ssh_cert: ${{ secrets.SSH_CERT }}
           ssh_key: ${{ secrets.SSH_KEY }}
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_USER: ${{ secrets.DB_USER }}
       - name: Deploy dashboard on created context
         run: |
           cd tools/setup;

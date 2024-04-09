@@ -18,4 +18,4 @@ init_config_if_needed()
 
 run_background_job;
 
-nginx -g daemon off;
+exec "$@";

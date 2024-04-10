@@ -19,7 +19,7 @@ insert_in_config()
 branches=$(curl -s https://api.github.com/repos/LilianSchall/bourse-pybd/branches | jq -r '.[].name' | grep "^dash-")
 
 new_config_file="./temp.conf";
-loaded_config_file="$VOLUME_PATH/nginx.conf";
+loaded_config_file="$VOLUME_PATH/default.conf";
 cp "$loaded_config_file" "$new_config_file";
 
 for branch in $branches; do
@@ -29,7 +29,7 @@ for branch in $branches; do
     fi
     
     insert_in_config "location /$branch {" "$new_config_file";
-    insert_in_config "    proxy_pass http://$branch;" "$new_config_file";
+    insert_in_config "    proxy_pass http://$branch:8050;" "$new_config_file";
     insert_in_config "}" "$new_config_file";
 
     echo "Added $branch";

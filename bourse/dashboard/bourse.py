@@ -20,7 +20,7 @@ if PREFIX_PATH is not None:
     app = dash.Dash(__name__,  
                     title="Bourse", 
                     suppress_callback_exceptions=True, 
-                    requests_pathname_prefix=PREFIX_PATH) # , external_stylesheets=external_stylesheets)
+                    url_base_pathname=PREFIX_PATH) # , external_stylesheets=external_stylesheets)
 else:
     app = dash.Dash(__name__,  
                     title="Bourse", 

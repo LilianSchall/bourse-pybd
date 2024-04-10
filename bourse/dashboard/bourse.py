@@ -4,6 +4,7 @@ from dash import html
 import dash.dependencies as ddep
 import pandas as pd
 import sqlalchemy
+import os
 
 # external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
@@ -11,7 +12,20 @@ DATABASE_URI = 'timescaledb://ricou:monmdp@db:5432/bourse'    # inside docker
 # DATABASE_URI = 'timescaledb://ricou:monmdp@localhost:5432/bourse'  # outisde docker
 engine = sqlalchemy.create_engine(DATABASE_URI)
 
-app = dash.Dash(__name__,  title="Bourse", suppress_callback_exceptions=True) # , external_stylesheets=external_stylesheets)
+# CUSTOM FOR INFRASTRUCTURE
+## START DO NOT REMOVE
+PREFIX_PATH = os.getenv("PREFIX_PATH")
+
+if PREFIX_PATH is not None:
+    app = dash.Dash(__name__,  
+                    title="Bourse", 
+                    suppress_callback_exceptions=True, 
+                    requests_pathname_prefix=PREFIX_PATH) # , external_stylesheets=external_stylesheets)
+else:
+    app = dash.Dash(__name__,  
+                    title="Bourse", 
+                    suppress_callback_exceptions=True) # , external_stylesheets=external_stylesheets)
+## END DO NOT REMOVE
 server = app.server
 app.layout = html.Div([
                 dcc.Textarea(

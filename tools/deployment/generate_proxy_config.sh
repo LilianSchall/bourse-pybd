@@ -29,7 +29,7 @@ for branch in $branches; do
     fi
     
     insert_in_config "location /$branch {" "$new_config_file";
-    insert_in_config "    proxy_pass http://$branch;" "$new_config_file";
+    insert_in_config "    proxy_pass http://$branch:8050;" "$new_config_file";
     insert_in_config "}" "$new_config_file";
 
     echo "Added $branch";

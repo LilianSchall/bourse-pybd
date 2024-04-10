@@ -28,6 +28,7 @@ jobs:
           -t "dashboard:${{ steps.extract_branch.outputs.branch }}" .;
           docker --context remote run \
           --name "${{ steps.extract_branch.outputs.branch }}" \
+          --env "PREFIX_PATH=/${{ steps.extract_branch.outputs.branch }}/" \
           --rm \
           --network="pybd-network" \
           --detach \
@@ -48,6 +49,7 @@ jobs:
       - name: Reload proxy on created context
         run: |
           docker --context remote run \
+          --rm \
           --name config-updater \
           --volume "pybd-volume:/volume" \
           --env "VOLUME_PATH=/volume" \

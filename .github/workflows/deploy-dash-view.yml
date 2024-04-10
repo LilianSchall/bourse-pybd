@@ -21,9 +21,11 @@ jobs:
           ssh_cert: ${{ secrets.SSH_CERT }}
           ssh_key: ${{ secrets.SSH_KEY }}
       - name: Deploy dashboard on created context
+        continue-on-error: true
         run: |
           cd bourse/docker/dashboard/;
           tar --transform 's|^dashboard/||' -czvf apps.tgz dashboard/bourse.py dashboard/*/;
+          docker --context remote rm -f "${{ steps.extract_branch.outputs.branch }}";
           docker --context remote build \
           -t "dashboard:${{ steps.extract_branch.outputs.branch }}" .;
           docker --context remote run \

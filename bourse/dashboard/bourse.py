@@ -37,6 +37,7 @@ else:
         suppress_callback_exceptions=True,
         external_stylesheets=external_stylesheets,
     )
+server = app.server
 ## END DO NOT REMOVE
 
 # -- Mock data

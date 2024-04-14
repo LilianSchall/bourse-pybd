@@ -31,7 +31,6 @@ jobs:
           docker --context remote run \
           --name "${{ steps.extract_branch.outputs.branch }}" \
           --env "PREFIX_PATH=/${{ steps.extract_branch.outputs.branch }}/" \
-          --rm \
           --network="pybd-network" \
           --detach \
           "dashboard:${{ steps.extract_branch.outputs.branch }}";

@@ -73,6 +73,7 @@ nav {
     border-radius: 5px;
     display: grid;
     grid-template-rows: 1fr auto;
+    max-height: calc((100vh - 56px) * 0.7);
 }
 
 .hide {

@@ -3,13 +3,12 @@ import time
 from datetime import date
 
 import dash
-import dash.dependencies as ddep
 import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import sqlalchemy
-from dash import dcc, html
+from dash import ClientsideFunction, clientside_callback, dcc, html
 from dash.dependencies import MATCH, Input, Output, State
 
 external_stylesheets = [dbc.themes.BOOTSTRAP]
@@ -58,6 +57,10 @@ candle_fig = go.Figure(
         )
     ]
 )
+
+current_fig = line_fig
+fig_layout = {"margin": {"l": 0, "r": 0, "t": 0, "b": 30}}
+current_fig.update_layout(fig_layout)
 
 table_df = pd.DataFrame(
     {
@@ -120,14 +123,23 @@ app.layout = html.Div(
                                 html.Button(
                                     [
                                         html.Img(
-                                            src=f"assets/header/{svg}.svg",
+                                            src="assets/header/night-mode.svg",
                                             className="svg-size-24 m-auto",
                                         ),
                                     ],
-                                    id=f"navbar-option-{svg}",
+                                    id="navbar-option-night-mode",
                                     className="navbar-btn hoverable-btn",
-                                )
-                                for svg in navbar_options_svg
+                                ),
+                                html.Button(
+                                    [
+                                        html.Img(
+                                            src="assets/header/full-screen.svg",
+                                            className="svg-size-24 m-auto",
+                                        ),
+                                    ],
+                                    id="navbar-option-full-screen",
+                                    className="navbar-btn hoverable-btn",
+                                ),
                             ],
                         ),
                         html.Button("Save", id="save-btn"),
@@ -158,7 +170,7 @@ app.layout = html.Div(
                 # -- Graph
                 html.Div(
                     [
-                        dcc.Graph(id="stock-graph", figure=line_fig),
+                        dcc.Graph(id="stock-graph", figure=current_fig),
                         html.Div(
                             [
                                 html.Div(
@@ -167,6 +179,7 @@ app.layout = html.Div(
                                             [
                                                 html.Button(
                                                     [date],
+                                                    id=f"fixed-date-{date}",
                                                     className="fixed-date-btn hoverable-btn",
                                                 )
                                                 for date in fixed_dates
@@ -384,7 +397,19 @@ def update_graph_polyline(polyline, candles):
     elif dash.ctx.triggered_id == id_prefix + "candles":
         return candle_fig
     else:
-        return line_fig
+        selected_fig = line_fig
+
+    # Update layout
+    selected_fig.update_layout(fig_layout)
+    return selected_fig
+
+
+clientside_callback(
+    ClientsideFunction(namespace="clientside", function_name="toggle_full_screen"),
+    Output("navbar-option-night-mode", "n_clicks"),
+    Input("navbar-option-full-screen", "n_clicks"),
+    prevent_initial_call=True,
+)
 
 
 if __name__ == "__main__":

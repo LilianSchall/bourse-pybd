@@ -222,11 +222,7 @@ app.layout = html.Div(
                                         html.Img(src="assets/table/chevron-up.svg"),
                                     ],
                                     id="table-chevron-up",
-                                ),
-                                html.Button(
-                                    [
-                                        html.Img(src="assets/table/arrow-expand.svg"),
-                                    ]
+                                    className="float-end",
                                 ),
                             ],
                             className="table-header",

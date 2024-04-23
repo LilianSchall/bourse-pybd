@@ -393,9 +393,9 @@ def update_children_checkbox(checkbox_value, options):
 def update_graph_polyline(polyline, candles):
     id_prefix = "graph-option-"
     if dash.ctx.triggered_id == id_prefix + "polyline":
-        return line_fig
+        selected_fig = line_fig
     elif dash.ctx.triggered_id == id_prefix + "candles":
-        return candle_fig
+        selected_fig = candle_fig
     else:
         selected_fig = line_fig
 

@@ -86,6 +86,8 @@ mock_companies = {
 
 fixed_dates = ["1D", "5D", "1M", "3M", "6M", "YTD", "1Y", "5Y", "ALL"]
 
+navbar_options_svg = ["night-mode", "full-screen"]
+
 graph_options_svg = [
     "bx-cross",
     "candles",
@@ -106,14 +108,7 @@ app.layout = html.Div(
             [
                 html.Div(
                     [
-                        html.Button(
-                            [
-                                html.Img(
-                                    src="assets/header/menu-burger.svg",
-                                    className="svg-size-30",
-                                ),
-                            ]
-                        ),
+                        html.Span("📈", style={"font-size": "1.4em"}),
                         html.H5("Stock Market Viewer", className="m-0"),
                     ],
                     className="navbar-left",
@@ -125,27 +120,17 @@ app.layout = html.Div(
                                 html.Button(
                                     [
                                         html.Img(
-                                            src="assets/header/night-mode.svg",
-                                            className="svg-size-24",
+                                            src=f"assets/header/{svg}.svg",
+                                            className="svg-size-24 m-auto",
                                         ),
-                                    ]
-                                ),
-                                html.Button(
-                                    [
-                                        html.Img(
-                                            src="assets/header/full-screen.svg",
-                                            className="svg-size-24",
-                                        ),
-                                    ]
-                                ),
+                                    ],
+                                    id=f"navbar-option-{svg}",
+                                    className="navbar-btn hoverable-btn",
+                                )
+                                for svg in navbar_options_svg
                             ],
-                            style={
-                                "display": "grid",
-                                "grid-template-columns": "1fr 1fr",
-                                "grid-gap": "8px",
-                            },
                         ),
-                        html.Button("Save", className="save-btn"),
+                        html.Button("Save", id="save-btn"),
                     ],
                     className="navbar-right",
                 ),
@@ -160,10 +145,11 @@ app.layout = html.Div(
                             [
                                 html.Img(
                                     src=f"assets/graph_options/{svg}.svg",
-                                    className="svg-size-24",
+                                    className="m-auto",
                                 ),
                             ],
                             id=f"graph-option-{svg}",
+                            className="graph-option-btn hoverable-btn",
                         )
                         for svg in graph_options_svg
                     ],
@@ -180,7 +166,8 @@ app.layout = html.Div(
                                         html.Div(
                                             [
                                                 html.Button(
-                                                    [date], className="fixed-date-btn"
+                                                    [date],
+                                                    className="fixed-date-btn hoverable-btn",
                                                 )
                                                 for date in fixed_dates
                                             ],
@@ -201,8 +188,12 @@ app.layout = html.Div(
                                 ),
                                 html.Div(
                                     [
-                                        html.Button(["%"], className="log-btn"),
-                                        html.Button(["log"], className="log-btn"),
+                                        html.Button(
+                                            ["%"], className="log-btn hoverable-btn"
+                                        ),
+                                        html.Button(
+                                            ["log"], className="log-btn hoverable-btn"
+                                        ),
                                     ],
                                     className="graph-log-container",
                                 ),

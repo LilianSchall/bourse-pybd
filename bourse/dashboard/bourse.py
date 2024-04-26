@@ -1,14 +1,15 @@
+import base64
 import os
 import time
 from datetime import date
+from difflib import get_close_matches
 
 import dash
 import dash_bootstrap_components as dbc
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 import sqlalchemy
-from dash import ClientsideFunction, clientside_callback, dcc, html
+from dash import ClientsideFunction, Patch, clientside_callback, dcc, html
 from dash.dependencies import MATCH, Input, Output, State
 
 external_stylesheets = [dbc.themes.BOOTSTRAP]
@@ -39,28 +40,26 @@ else:
 server = app.server
 ## END DO NOT REMOVE
 
-# -- Mock data
-df = px.data.stocks()
-line_fig = px.line(df, x="date", y="GOOG")
+# -- Constants
+# MIN_DATE = date(2019, 1, 1)
+# MAX_DATE = date(2023, 12, 29)
+# INIT_DATE = date(2021, 1, 1)
+MIN_DATE = date(2015, 2, 17)
+MAX_DATE = date(2017, 2, 17)
+INIT_DATE = date(2016, 1, 1)
+BASIC_FIG_LAYOUT = dict(
+    margin=dict(l=0, r=0, t=0, b=30),
+    xaxis=dict(
+        type="date",
+        range=[MIN_DATE.strftime("%Y-%m-%d"), MAX_DATE.strftime("%Y-%m-%d")],
+    ),
+    yaxis=dict(type="linear"),
+)
 
+# -- Mock data
 df = pd.read_csv(
     "https://raw.githubusercontent.com/plotly/datasets/master/finance-charts-apple.csv"
 )
-candle_fig = go.Figure(
-    data=[
-        go.Candlestick(
-            x=df["Date"],
-            open=df["AAPL.Open"],
-            high=df["AAPL.High"],
-            low=df["AAPL.Low"],
-            close=df["AAPL.Close"],
-        )
-    ]
-)
-
-current_fig = line_fig
-fig_layout = {"margin": {"l": 0, "r": 0, "t": 0, "b": 30}}
-current_fig.update_layout(fig_layout)
 
 table_df = pd.DataFrame(
     {
@@ -98,7 +97,6 @@ graph_options_svg = [
     "text",
     "ruler",
     "zoom",
-    "hide",
     "trash-can",
 ]
 
@@ -143,6 +141,7 @@ app.layout = html.Div(
                             ],
                         ),
                         html.Button("Save", id="save-btn"),
+                        dcc.Download(id="download-figure"),
                     ],
                     className="navbar-right",
                 ),
@@ -170,7 +169,10 @@ app.layout = html.Div(
                 # -- Graph
                 html.Div(
                     [
-                        dcc.Graph(id="stock-graph", figure=current_fig),
+                        dcc.Graph(
+                            id="stock-graph",
+                            figure=go.Figure(layout=BASIC_FIG_LAYOUT),
+                        ),
                         html.Div(
                             [
                                 html.Div(
@@ -189,9 +191,9 @@ app.layout = html.Div(
                                         html.Div(className="vertical-divider"),
                                         dcc.DatePickerRange(
                                             id="date-picker-range",
-                                            min_date_allowed=date(2019, 1, 1),
-                                            max_date_allowed=date(2023, 12, 29),
-                                            initial_visible_month=date(2021, 8, 5),
+                                            min_date_allowed=MIN_DATE,
+                                            max_date_allowed=MAX_DATE,
+                                            initial_visible_month=INIT_DATE,
                                             start_date_placeholder_text="Start Period",
                                             end_date_placeholder_text="End Period",
                                             with_portal=True,
@@ -202,16 +204,20 @@ app.layout = html.Div(
                                 html.Div(
                                     [
                                         html.Button(
-                                            ["%"], className="log-btn hoverable-btn"
+                                            ["lin"],
+                                            id="lin-btn",
+                                            className="lin-log-btn hoverable-btn",
                                         ),
                                         html.Button(
-                                            ["log"], className="log-btn hoverable-btn"
+                                            ["log"],
+                                            id="log-btn",
+                                            className="lin-log-btn hoverable-btn",
                                         ),
                                     ],
-                                    className="graph-log-container",
+                                    className="graph-lin-log-container",
                                 ),
                             ],
-                            className="date-log-container",
+                            className="date-lin-log-container",
                         ),
                     ],
                     id="graph-container",
@@ -258,62 +264,17 @@ app.layout = html.Div(
                                     className="svg-size-20",
                                 ),
                                 dcc.Input(
-                                    id="input_search",
+                                    id="input-company",
                                     type="text",
                                     placeholder="Search company",
+                                    debounce=True,
                                 ),
                             ],
                             className="company-search-bar",
                         ),
                         html.Div(
-                            [
-                                html.Details(
-                                    [
-                                        html.Summary(
-                                            children=[
-                                                dcc.Checklist(
-                                                    [
-                                                        {
-                                                            "label": html.Span(
-                                                                company,
-                                                                className="ms-2 lead fw-normal",
-                                                            ),
-                                                            "value": company,
-                                                        }
-                                                    ],
-                                                    id={
-                                                        "type": "company-checkbox",
-                                                        "index": company,
-                                                    },
-                                                    inputStyle={
-                                                        "width": "15px",
-                                                        "height": "15px",
-                                                    },
-                                                    className="d-inline-block",
-                                                )
-                                            ],
-                                        ),
-                                        dcc.Checklist(
-                                            [
-                                                {
-                                                    "label": html.Span(
-                                                        symbol, className="ms-2"
-                                                    ),
-                                                    "value": symbol,
-                                                }
-                                                for symbol in symbols
-                                            ],
-                                            id={
-                                                "type": "symbol-checkbox",
-                                                "index": company,
-                                            },
-                                            style={"margin-left": "30px"},
-                                        ),
-                                    ],
-                                    className="my-2",
-                                )
-                                for company, symbols in mock_companies.items()
-                            ],
+                            children=[],
+                            id="company-selection",
                             className="ms-3",
                             style={"overflow-y": "auto", "height": "480px"},
                         ),
@@ -326,6 +287,89 @@ app.layout = html.Div(
     ],
     className="app-container",
 )
+
+
+# -- Functions
+def add_or_update_trace(fig, trace_name):
+    # Check if the trace type already exists
+    for trace in fig["data"]:
+        if trace["name"] == trace_name:
+            # Toggle visibility
+            trace["visible"] = not trace["visible"]
+            return fig
+
+    # Add a new trace if it doesn't exist
+    if trace_name == "polyline":
+        new_trace = go.Scatter(
+            x=df["Date"],
+            y=df["AAPL.High"],
+            mode="lines",
+            line=dict(color="royalblue"),
+            name=trace_name,
+            visible=True,
+        )
+        fig["data"].append(new_trace)
+    elif trace_name == "candles":
+        new_trace = go.Candlestick(
+            x=df["Date"],
+            open=df["AAPL.Open"],
+            high=df["AAPL.High"],
+            low=df["AAPL.Low"],
+            close=df["AAPL.Close"],
+            name=trace_name,
+            visible=True,
+        )
+        fig["data"].append(new_trace)
+
+    return fig
+
+
+def create_company_details(company, symbols):
+    html_details = html.Details(
+        [
+            html.Summary(
+                children=[
+                    dcc.Checklist(
+                        [
+                            {
+                                "label": html.Span(
+                                    company,
+                                    className="ms-2 lead fw-normal",
+                                ),
+                                "value": company,
+                            }
+                        ],
+                        id={
+                            "type": "company-checkbox",
+                            "index": company,
+                        },
+                        inputStyle={
+                            "width": "15px",
+                            "height": "15px",
+                        },
+                        className="d-inline-block",
+                    )
+                ],
+            ),
+            dcc.Checklist(
+                [
+                    {
+                        "label": html.Span(symbol, className="ms-2"),
+                        "value": symbol,
+                    }
+                    for symbol in symbols
+                ],
+                id={
+                    "type": "symbol-checkbox",
+                    "index": company,
+                },
+                style={"margin-left": "30px"},
+            ),
+        ],
+        className="my-2",
+    )
+
+    return html_details
 
 
 # -- Callbacks
@@ -386,22 +430,101 @@ def update_children_checkbox(checkbox_value, options):
 
 
 @app.callback(
+    Output("lin-btn", "className"),
+    Output("log-btn", "className"),
+    Input("lin-btn", "n_clicks"),
+    Input("log-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def toggle_lin_log_btn(*args):
+    lin_class = "lin-log-btn hoverable-btn"
+    log_class = "lin-log-btn hoverable-btn"
+    if dash.ctx.triggered_id == "lin-btn":
+        lin_class += " active"
+    else:
+        log_class += " active"
+    return lin_class, log_class
+
+
+@app.callback(
     Output("stock-graph", "figure"),
+    State("stock-graph", "figure"),
+    Input("date-picker-range", "start_date"),
+    Input("date-picker-range", "end_date"),
+    Input("lin-btn", "n_clicks"),
+    Input("log-btn", "n_clicks"),
     Input("graph-option-polyline", "n_clicks"),
     Input("graph-option-candles", "n_clicks"),
+    Input("graph-option-trash-can", "n_clicks"),
+    prevent_initial_call=True,
 )
-def update_graph_polyline(polyline, candles):
+def update_graph_polyline(
+    current_fig, start_date, end_date, lin_clicks, log_clicks, *args
+):
+    selected_fig = current_fig
+
+    if dash.ctx.triggered_id == "lin-btn":
+        selected_fig["layout"]["yaxis"]["type"] = "linear"
+    elif dash.ctx.triggered_id == "log-btn":
+        selected_fig["layout"]["yaxis"]["type"] = "log"
+
     id_prefix = "graph-option-"
     if dash.ctx.triggered_id == id_prefix + "polyline":
-        selected_fig = line_fig
+        selected_fig = add_or_update_trace(selected_fig, "polyline")
     elif dash.ctx.triggered_id == id_prefix + "candles":
-        selected_fig = candle_fig
-    else:
-        selected_fig = line_fig
+        selected_fig = add_or_update_trace(selected_fig, "candles")
+    elif dash.ctx.triggered_id == id_prefix + "trash-can":
+        selected_fig = go.Figure(layout=BASIC_FIG_LAYOUT)  # Reset graph
+        selected_fig = selected_fig.to_dict()
+    elif "date-picker-range" not in dash.ctx.triggered_id:
+        print("Warning: No graph option selected")
 
-    # Update layout
-    selected_fig.update_layout(fig_layout)
+    # Update time range
+    if start_date and end_date:
+        if "date-picker-range" in dash.ctx.triggered_id:
+            selected_fig = Patch()
+        selected_fig["layout"]["xaxis"]["type"] = "date"
+        selected_fig["layout"]["xaxis"]["range"][0] = start_date
+        selected_fig["layout"]["xaxis"]["range"][1] = end_date
+
     return selected_fig
+
+
+@app.callback(
+    Output("company-selection", "children"),
+    Input("input-company", "value"),
+    prevent_initial_call=True,
+)
+def update_company_selection(company):
+    matches = get_close_matches(
+        company, mock_companies.keys(), n=len(mock_companies), cutoff=0.5
+    )
+    children = []
+    if not matches:
+        return children
+
+    for company in matches:
+        symbols = mock_companies[company]
+        html_details = create_company_details(company, symbols)
+        children.append(html_details)
+
+    return children
+
+
+@app.callback(
+    Output("download-figure", "data"),
+    State("stock-graph", "figure"),
+    Input("save-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def func(fig, n_clicks):
+    # Due to a bug in plotly, rangeslider on yaxis must be removed to convert fig to go.Figure
+    if "rangeslider" in fig["layout"]["xaxis"]:
+        del fig["layout"]["xaxis"]["rangeslider"]["yaxis"]
+    fig = go.Figure(fig)
+    img_bytes = fig.to_image(format="png")
+    encoded_image = base64.b64encode(img_bytes).decode()
+    return dict(base64=True, content=encoded_image, filename="plot.png")
 
 
 clientside_callback(

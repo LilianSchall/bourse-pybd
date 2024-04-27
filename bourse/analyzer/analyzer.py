@@ -3,14 +3,18 @@ import numpy as np
 import sklearn
 import dateutil
 import os
+from multiprocessing import get_context, Pool
 
 import timescaledb_model as tsdb
+from mylogging import getLogger
 
-# db = tsdb.TimescaleStockMarketModel('bourse', 'ricou', 'db', 'monmdp')        # inside docker
-db = tsdb.TimescaleStockMarketModel('bourse', 'ricou', 'localhost', 'monmdp') # outside docker
+db = tsdb.TimescaleStockMarketModel('bourse', 'ricou', 'db', 'monmdp')        # inside docker
+# db = tsdb.TimescaleStockMarketModel('bourse', 'ricou', 'localhost', 'monmdp') # outside docker
 companies_save = None 
 comp_batch = None
 stock_batch = None
+
+log = getLogger(__name__)
 
 def process_companies(df: pd.DataFrame | pd.Series, nb_companies: int):
     global companies_save
@@ -62,14 +66,17 @@ def concat_df(companies, stocks):
     global stock_batch
 
     if comp_batch is None:
-        comp_batch = companies
+        comp_batch = [companies]
+        # comp_batch = companies
     else:
-        comp_batch = pd.concat([comp_batch, companies])
+        #comp_batch = pd.concat([comp_batch, companies])
+        comp_batch.append(companies)
 
     if stock_batch is None:
-        stock_batch = stocks
+        stock_batch = [stocks]
     else:
-        stock_batch = pd.concat([stock_batch, stocks])
+        # stock_batch = pd.concat([stock_batch, stocks])
+        stock_batch.append(stocks)
 
 def process_dataframe(df: pd.DataFrame | pd.Series, nb_companies: int):
     # companies, stocks, daystocks, file_done, tags
@@ -93,10 +100,17 @@ def compute_alias_date(filename: str):
         date = dateutil.parser.parse(date_str)
         return alias, date
 
+def commit_companies(df):
+    db.df_write(df, "companies")
+
+def commit_stocks(df):
+    db.df_write(df, "stocks")
+    
+
 def store_file(filepath, nb_companies, nb_files_processed):
     filename = os.path.basename(filepath)
     if db.is_file_done(filename):
-        print("File has already been processed")
+        log.debug("File has already been processed")
         return
     df = pd.read_pickle(filepath)
 
@@ -106,12 +120,17 @@ def store_file(filepath, nb_companies, nb_files_processed):
     df["date"] = date
 
     nb_companies = process_dataframe(df, nb_companies)
-    if nb_files_processed % 100 == 0 and nb_files_processed != 0:
+    if nb_files_processed % 1000 == 0 and nb_files_processed != 0:
         global comp_batch
         global stock_batch
-        print(f"Committing {100} files to db")
-        db.df_write(comp_batch, "companies")
-        db.df_write(stock_batch, "stocks")
+        log.debug(f"Committing {1000} files to db")
+        #db.df_write(comp_batch, "companies")
+        #db.df_write(stock_batch, "stocks")
+        with get_context("spawn").Pool(12) as p:
+            p.map(commit_companies, comp_batch)
+
+        with get_context("spawn").Pool(12) as p:
+            p.map(commit_stocks, stock_batch)
         comp_batch, stock_batch = None, None
 
     return nb_companies 
@@ -124,12 +143,12 @@ def process_files(dir, nb_companies=0, nb_files_processed=0):
                                       nb_files_processed)
             nb_files_processed += 1
             if nb_files_processed % 10 == 0:
-                print(nb_files_processed)
+                log.debug(nb_files_processed)
         for dir in dirs:
             nb_files_processed, nb_companies = process_files(dir, nb_companies=0, nb_files_processed=nb_files_processed)
     return nb_files_processed, nb_companies
 
 
 if __name__ == '__main__':
-    process_files("./bourse/")
-    print("Done")
+    process_files("./data/")
+    log.debug("Done")

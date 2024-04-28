@@ -105,9 +105,11 @@ def commit_companies(df):
 
 def commit_stocks(df):
     db.df_write(df, "stocks")
-    
 
-def store_file(filepath, nb_companies, nb_files_processed):
+def commit_daystocks(df):
+    db.df_write(df, "daystocks")
+
+def store_file(filepath, nb_companies, nb_files_processed, prev_date):
     filename = os.path.basename(filepath)
     if db.is_file_done(filename):
         log.debug("File has already been processed")
@@ -118,12 +120,12 @@ def store_file(filepath, nb_companies, nb_files_processed):
     market = convert_generator_to_df(db.df_query(f"SELECT id FROM markets WHERE alias = '{alias}'"))
     df["mid"] = market.iloc[0]["id"]
     df["date"] = date
-
-    nb_companies = process_dataframe(df, nb_companies)
-    if nb_files_processed % 1000 == 0 and nb_files_processed != 0:
+    
+    #if nb_files_processed % 100 == 0 and nb_files_processed != 0:
+    if date.date() != prev_date and prev_date != None:
         global comp_batch
         global stock_batch
-        log.debug(f"Committing {1000} files to db")
+        log.debug(f"Committing {len(stock_batch)} files to db")
         #db.df_write(comp_batch, "companies")
         #db.df_write(stock_batch, "stocks")
         with get_context("spawn").Pool(12) as p:
@@ -131,20 +133,39 @@ def store_file(filepath, nb_companies, nb_files_processed):
 
         with get_context("spawn").Pool(12) as p:
             p.map(commit_stocks, stock_batch)
+
+        daystocks = pd.concat(stock_batch, ignore_index=False)
+        daystocks = daystocks.groupby(['cid']).agg(date=pd.NamedAgg(column='value', aggfunc='first'),
+                                                   open=pd.NamedAgg(column='value', aggfunc='first'),
+                                                   close=pd.NamedAgg(column='value', aggfunc='last'),
+                                                   high=pd.NamedAgg(column='value', aggfunc='max'),
+                                                   low=pd.NamedAgg(column='value', aggfunc='min'),
+                                                   #volume=pd.NamedAgg(column='volume', aggfunc='sum'),
+        )
+        daystocks['date'] = prev_date
+
+        with get_context("spawn").Pool(12) as p:
+            p.map(commit_daystocks, np.array_split(daystocks, 12))
+        
         comp_batch, stock_batch = None, None
 
-    return nb_companies 
+    nb_companies = process_dataframe(df, nb_companies)
+
+
+    return nb_companies, date.date()
 
 def process_files(dir, nb_companies=0, nb_files_processed=0):
+    log.debug(dir)
     for root, dirs, files in os.walk(dir):
-        for file in files:
-            nb_companies = store_file(os.path.join(root, file),
+        prev_date = None
+        for file in sorted(files):
+            nb_companies, prev_date = store_file(os.path.join(root, file),
                                       nb_companies,
-                                      nb_files_processed)
+                                      nb_files_processed, prev_date)
             nb_files_processed += 1
             if nb_files_processed % 10 == 0:
                 log.debug(nb_files_processed)
-        for dir in dirs:
+        for dir in sorted(dirs):
             nb_files_processed, nb_companies = process_files(dir, nb_companies=0, nb_files_processed=nb_files_processed)
     return nb_files_processed, nb_companies
 

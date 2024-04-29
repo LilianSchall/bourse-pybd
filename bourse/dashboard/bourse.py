@@ -235,6 +235,7 @@ app.layout = html.Div(
                                             initial_visible_month=INIT_DATE,
                                             start_date_placeholder_text="Start Period",
                                             end_date_placeholder_text="End Period",
+                                            clearable=True,
                                             with_portal=True,
                                         ),
                                     ],

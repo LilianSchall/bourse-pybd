@@ -244,7 +244,7 @@ nav {
 
 .company-search-bar {
     display: grid;
-    grid-template-columns: auto auto;
+    grid-template-columns: auto 1fr;
     justify-content: start;
     align-items: center;
     gap: 5px;
@@ -256,10 +256,17 @@ nav {
     padding-left: 10px;
 }
 
-.company-search-bar > input {
+#input-company { 
     border: none;
     background-color: inherit;
     width: 100%;
+}
+
+#input-company:disabled {
+    cursor: not-allowed;
+}
+#input-company:disabled::placeholder {
+    color: #BDBDBD;
 }
 
 .svg-size-20 {

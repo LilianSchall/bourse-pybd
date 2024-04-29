@@ -369,7 +369,7 @@ app.layout = html.Div(
 
 
 # -- Functions
-def add_new_stock(fig, symbol, visible=True):
+def add_new_stock(fig, symbol):
     global STOCKS
 
     # Get company id from COMPANIES
@@ -398,7 +398,7 @@ def add_new_stock(fig, symbol, visible=True):
             y=STOCKS[symbol],
             mode="lines",
             name=symbol,
-            visible=visible,
+            visible=False,
         )
     )
 
@@ -460,6 +460,14 @@ def create_company_details(company, company_index, symbols):
 
 
 # -- Callbacks
+@app.callback(
+    Output("input-company", "disabled"),
+    Input("market-selection", "value"),
+)
+def disable_input_company(market_id):
+    return not market_id
+
+
 @app.callback(
     Output("main-container", "className"),
     Output("table-container", "className"),
@@ -628,13 +636,24 @@ def update_graph_polyline(
         if not svalues:
             # If symbol is unchecked, remove it from the figure
             fig.update_traces(visible=False, selector=dict(name=symbol))
-        elif symbol in STOCKS.columns:
-            # If trace is already in the figure, update it
-            fig.update_traces(visible=True, selector=dict(name=symbol))
         else:
-            visible = polyline_clicks is not None and polyline_clicks % 2 == 1
-            # Fetch the stock data from the database and add it to the figure
-            fig = add_new_stock(fig, symbol, visible)
+            if symbol not in STOCKS.columns:
+                # Fetch the stock data from the database and add it to the figure
+                fig = add_new_stock(fig, symbol)
+
+            is_poly_visible = polyline_clicks is not None and polyline_clicks % 2 == 1
+            is_candle_visible = (
+                candlestick_clicks is not None and candlestick_clicks % 2 == 1
+            )
+
+            if is_poly_visible:
+                fig.update_traces(
+                    visible=True, selector=dict(name=symbol, type="scatter")
+                )
+            if is_candle_visible:
+                fig.update_traces(
+                    visible=True, selector=dict(name=symbol, type="candlestick")
+                )
     elif ctx.triggered_id == "lin-btn":
         fig.update_layout(yaxis_type="linear")
     elif ctx.triggered_id == "log-btn":

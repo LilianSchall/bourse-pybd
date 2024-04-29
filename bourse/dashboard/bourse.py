@@ -82,6 +82,7 @@ MARKETS = pd.read_sql_query(query, engine)
 # Empty dataframe to store the companies and their symbols
 COMPANIES = pd.DataFrame(columns=["id", "name", "symbol"])
 SELECTED_COMPANIES = set()
+SELECTED_SYMBOLS = set()
 
 # Fetch all companies and their symbols from the database
 # query = "SELECT company, symbol FROM companies"
@@ -408,6 +409,7 @@ def add_new_stock(fig, symbol, visible=True):
 
 
 def create_company_details(company, company_index, symbols):
+    selected_symbols = SELECTED_SYMBOLS.intersection(symbols)
     html_details = html.Details(
         [
             html.Summary(
@@ -448,6 +450,7 @@ def create_company_details(company, company_index, symbols):
                     "index": company_index,
                 },
                 style={"margin-left": "30px"},
+                value=list(selected_symbols),
             ),
         ],
         className="my-2",
@@ -508,14 +511,60 @@ def hide_graph(n_clicks, graph_container_class):
     State({"type": "symbol-checkbox", "index": MATCH}, "options"),
     prevent_initial_call=True,
 )
-def update_children_checkbox(checkbox_value, coptions, soptions):
+def update_children_checkbox(company_checkbox_value, coptions, soptions):
     company = coptions[0]["value"]
-    if not checkbox_value:
-        SELECTED_COMPANIES.remove(company)
-        return checkbox_value
+    symbols = []
+    if not company_checkbox_value:
+        SELECTED_COMPANIES.discard(company)
+        for option in soptions:
+            SELECTED_SYMBOLS.discard(option["value"])
+        return symbols
 
     SELECTED_COMPANIES.add(company)
-    return [option["value"] for option in soptions]
+    for option in soptions:
+        symbols.append(option["value"])
+        SELECTED_SYMBOLS.add(option["value"])
+    return symbols
+
+
+@app.callback(
+    Output("dummy-div", "n_clicks"),
+    Input({"type": "symbol-checkbox", "index": ALL}, "value"),
+    State({"type": "symbol-checkbox", "index": ALL}, "options"),
+    prevent_initial_call=True,
+)
+def update_selected_symbol(symbols_value, soptions):
+    idx = ctx.triggered_id["index"]
+    symbol = soptions[idx][0]["value"]
+    if not symbols_value[idx]:
+        SELECTED_SYMBOLS.discard(symbol)
+    else:
+        SELECTED_SYMBOLS.add(symbol)
+    return 0
+
+
+# @app.callback(
+#     Output("dummy-div", "n_clicks"),
+#     Input({"type": "symbol-checkbox", "index": ALL}, "value"),
+#     State({"type": "symbol-checkbox", "index": ALL}, "options"),
+#     State({"type": "company-checkbox", "index": ALL}, "options"),
+#     prevent_initial_call=True,
+# )
+# def update_parent_checkbox(symbol_checkbox_value, soptions, coptions):
+#     idx = ctx.triggered_id["index"]
+#     company = coptions[idx][0]["value"]
+#     print(f"SYMBOLS: {symbol_checkbox_value}")
+#     print(f"SOPTIONS: {soptions}")
+#     if symbol_checkbox_value[idx] is None:
+#         return 0
+#     is_all_selected = len(symbol_checkbox_value[idx]) == len(soptions[idx])
+#     if not is_all_selected:
+#         print("REMOVED: ", company)
+#         SELECTED_COMPANIES.discard(company)
+#     else:
+#         print("ADDED: ", company)
+#         SELECTED_COMPANIES.add(company)
+#     return 0
 
 
 @app.callback(

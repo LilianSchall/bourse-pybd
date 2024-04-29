@@ -504,19 +504,18 @@ def hide_graph(n_clicks, graph_container_class):
 @app.callback(
     Output({"type": "symbol-checkbox", "index": MATCH}, "value"),
     Input({"type": "company-checkbox", "index": MATCH}, "value"),
+    State({"type": "company-checkbox", "index": MATCH}, "options"),
     State({"type": "symbol-checkbox", "index": MATCH}, "options"),
     prevent_initial_call=True,
 )
-def update_children_checkbox(checkbox_value, options):
+def update_children_checkbox(checkbox_value, coptions, soptions):
+    company = coptions[0]["value"]
     if not checkbox_value:
+        SELECTED_COMPANIES.remove(company)
         return checkbox_value
 
-    company = checkbox_value[0]
-    if company in SELECTED_COMPANIES:
-        SELECTED_COMPANIES.remove(company)
-    else:
-        SELECTED_COMPANIES.add(company)
-    return [option["value"] for option in options]
+    SELECTED_COMPANIES.add(company)
+    return [option["value"] for option in soptions]
 
 
 @app.callback(

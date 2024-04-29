@@ -9,13 +9,13 @@ import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.graph_objects as go
 import sqlalchemy
-from dash import ClientsideFunction, Patch, clientside_callback, dcc, html
-from dash.dependencies import MATCH, Input, Output, State
+from dash import ClientsideFunction, Patch, clientside_callback, ctx, dcc, html
+from dash.dependencies import ALL, MATCH, Input, Output, State
 
 external_stylesheets = [dbc.themes.BOOTSTRAP]
 
-DATABASE_URI = "timescaledb://ricou:monmdp@db:5432/bourse"  # inside docker
-# DATABASE_URI = 'timescaledb://ricou:monmdp@localhost:5432/bourse'  # outisde docker
+# DATABASE_URI = "timescaledb://ricou:monmdp@db:5432/bourse"  # inside docker
+DATABASE_URI = "timescaledb://ricou:monmdp@localhost:5432/bourse"  # outisde docker
 engine = sqlalchemy.create_engine(DATABASE_URI)
 
 # CUSTOM FOR INFRASTRUCTURE
@@ -41,12 +41,12 @@ server = app.server
 ## END DO NOT REMOVE
 
 # -- Constants
-# MIN_DATE = date(2019, 1, 1)
-# MAX_DATE = date(2023, 12, 29)
-# INIT_DATE = date(2021, 1, 1)
-MIN_DATE = date(2015, 2, 17)
-MAX_DATE = date(2017, 2, 17)
-INIT_DATE = date(2016, 1, 1)
+MIN_DATE = date(2019, 1, 1)
+MAX_DATE = date(2023, 12, 29)
+INIT_DATE = date(2021, 1, 1)
+# MIN_DATE = date(2015, 2, 17)
+# MAX_DATE = date(2017, 2, 17)
+# INIT_DATE = date(2016, 1, 1)
 BASIC_FIG_LAYOUT = dict(
     margin=dict(l=0, r=0, t=0, b=30),
     xaxis=dict(
@@ -56,7 +56,7 @@ BASIC_FIG_LAYOUT = dict(
     yaxis=dict(type="linear"),
 )
 
-# -- Mock data
+# -- Data
 df = pd.read_csv(
     "https://raw.githubusercontent.com/plotly/datasets/master/finance-charts-apple.csv"
 )
@@ -75,6 +75,17 @@ table_df = pd.DataFrame(
     }
 )
 
+# Fetch all markets from the database
+query = "SELECT id, alias FROM markets"
+MARKETS = pd.read_sql_query(query, engine)
+
+# Empty dataframe to store the companies and their symbols
+COMPANIES = pd.DataFrame(columns=["id", "name", "symbol"])
+SELECTED_COMPANIES = set()
+
+# Fetch all companies and their symbols from the database
+# query = "SELECT company, symbol FROM companies"
+# companies = pd.read_sql_query(query, engine)
 mock_companies = {
     "Company A": ["SYM1", "SYM2", "SYM3"],
     "Company B": ["SYM4", "SYM5"],
@@ -84,7 +95,30 @@ mock_companies = {
     "Company F": ["SYM14", "SYM15", "SYM16"],
     "Company G": ["SYM17", "SYM18", "SYM19"],
     "Company H": ["SYM20", "SYM21", "SYM22"],
+    "Company I": ["SYM23", "SYM24", "SYM25"],
+    "Company J": ["SYM26", "SYM27", "SYM28"],
+    "Company K": ["SYM29", "SYM30", "SYM31"],
+    "Company L": ["SYM32", "SYM33", "SYM34"],
+    "Company M": ["SYM35", "SYM36", "SYM37"],
+    "Company N": ["SYM38", "SYM39", "SYM40"],
+    "Company O": ["SYM41", "SYM42", "SYM43"],
+    "Company P": ["SYM44", "SYM45", "SYM46"],
+    "Company Q": ["SYM47", "SYM48", "SYM49"],
+    "Company R": ["SYM50", "SYM51", "SYM52"],
+    "Company S": ["SYM53", "SYM54", "SYM55"],
+    "Company T": ["SYM56", "SYM57", "SYM58"],
+    "Company U": ["SYM59", "SYM60", "SYM61"],
+    "Company V": ["SYM62", "SYM63", "SYM64"],
+    "Company W": ["SYM65", "SYM66", "SYM67"],
+    "Company X": ["SYM68", "SYM69", "SYM70"],
+    "Company Y": ["SYM71", "SYM72", "SYM73"],
+    "Company Z": ["SYM74", "SYM75", "SYM76"],
 }
+
+DAYSTOCKS = pd.DataFrame(
+    columns=["date", "cid", "open", "close", "high", "low", "volume"]
+)
+STOCKS = pd.DataFrame()
 
 fixed_dates = ["1D", "5D", "1M", "3M", "6M", "YTD", "1Y", "5Y", "ALL"]
 
@@ -253,78 +287,127 @@ app.layout = html.Div(
                     ],
                     id="table-container",
                 ),
-                # -- Graph company selection sidebar
+                # -- Graph market and company selection sidebar
                 html.Div(
                     [
-                        html.H4("Company Selection"),
                         html.Div(
                             [
-                                html.Img(
-                                    src="assets/company_selection/search-line.svg",
-                                    className="svg-size-20",
-                                ),
-                                dcc.Input(
-                                    id="input-company",
-                                    type="text",
-                                    placeholder="Search company",
-                                    debounce=True,
+                                html.H4("Market Selection"),
+                                dcc.Dropdown(
+                                    [
+                                        {
+                                            "label": html.Span(
+                                                [
+                                                    html.Img(
+                                                        src=f"assets/graph_selection/markets/{markets['alias']}.svg",
+                                                        height=30,
+                                                        style={
+                                                            "display": "inline-block",
+                                                        },
+                                                    ),
+                                                    html.Span(
+                                                        markets["alias"],
+                                                        style={
+                                                            "font-size": 15,
+                                                            "padding-left": 10,
+                                                        },
+                                                    ),
+                                                ],
+                                                style={
+                                                    "align-items": "center",
+                                                    "justify-content": "center",
+                                                },
+                                            ),
+                                            "value": markets["id"],
+                                        }
+                                        for _, markets in MARKETS.iterrows()
+                                    ],
+                                    id="market-selection",
                                 ),
                             ],
-                            className="company-search-bar",
+                            id="market-selection-container",
                         ),
                         html.Div(
-                            children=[],
-                            id="company-selection",
-                            className="ms-3",
-                            style={"overflow-y": "auto", "height": "480px"},
+                            [
+                                html.H4("Company Selection"),
+                                html.Div(
+                                    [
+                                        html.Img(
+                                            src="assets/graph_selection/search-line.svg",
+                                            className="svg-size-20",
+                                        ),
+                                        dcc.Input(
+                                            id="input-company",
+                                            type="text",
+                                            placeholder="Search company",
+                                            debounce=True,
+                                        ),
+                                    ],
+                                    className="company-search-bar",
+                                ),
+                                html.Div(
+                                    children=[],
+                                    id="company-selection",
+                                    className="ms-3",
+                                    style={"overflow-y": "auto"},
+                                ),
+                            ],
+                            id="company-selection-container",
                         ),
                     ],
-                    className="company-selection-container",
+                    id="graph-selection-container",
                 ),
             ],
             id="main-container",
         ),
+        # -- Dummy hidden div
+        html.Div(id="dummy-div", style={"display": "none"}),
     ],
     className="app-container",
 )
 
 
 # -- Functions
-def add_or_update_trace(fig, trace_name):
-    # Check if the trace type already exists
-    for trace in fig["data"]:
-        if trace["name"] == trace_name:
-            # Toggle visibility
-            trace["visible"] = not trace["visible"]
-            return fig
+def add_new_stock(fig, symbol, visible=True):
+    global STOCKS
 
-    # Add a new trace if it doesn't exist
-    if trace_name == "polyline":
-        new_trace = go.Scatter(
-            x=df["Date"],
-            y=df["AAPL.High"],
+    # Get company id from COMPANIES
+    cid = COMPANIES.loc[COMPANIES["symbol"] == symbol, "id"].values[0]
+
+    # Query all stocks with cid
+    query = f"SELECT date, value FROM stocks WHERE cid = {cid}"
+    query_df = pd.read_sql_query(query, engine)
+
+    # Set date as index
+    query_df.set_index("date", inplace=True)
+
+    # Format datetime
+    query_df.index = pd.to_datetime(query_df.index.strftime("%Y-%m-%d %H:%M:%S"))
+
+    # Change value column name to symbol name
+    query_df.rename(columns={"value": symbol}, inplace=True)
+
+    # Merge query_df with STOCKS
+    STOCKS = pd.concat([STOCKS, query_df], axis=1).sort_index()
+
+    # Add the symbol polyline trace to the figure
+    fig.add_trace(
+        go.Scatter(
+            x=STOCKS.index,
+            y=STOCKS[symbol],
             mode="lines",
-            line=dict(color="royalblue"),
-            name=trace_name,
-            visible=True,
+            name=symbol,
+            visible=visible,
         )
-        fig["data"].append(new_trace)
-    elif trace_name == "candles":
-        new_trace = go.Candlestick(
-            x=df["Date"],
-            open=df["AAPL.Open"],
-            high=df["AAPL.High"],
-            low=df["AAPL.Low"],
-            close=df["AAPL.Close"],
-            name=trace_name,
-            visible=True,
-        )
-        fig["data"].append(new_trace)
+    )
+
+    # Add the symbol candlestick trace to the figure
+    # TODO: USE DAYSTOCKS
 
     return fig
 
 
-def create_company_details(company, symbols):
+def create_company_details(company, company_index, symbols):
     html_details = html.Details(
         [
             html.Summary(
@@ -341,13 +424,14 @@ def create_company_details(company, symbols):
                         ],
                         id={
                             "type": "company-checkbox",
-                            "index": company,
+                            "index": company_index,
                         },
                         inputStyle={
                             "width": "15px",
                             "height": "15px",
                         },
                         className="d-inline-block",
+                        value=[company] if company in SELECTED_COMPANIES else [],
                     )
                 ],
             ),
@@ -361,7 +445,7 @@ def create_company_details(company, symbols):
                 ],
                 id={
                     "type": "symbol-checkbox",
-                    "index": company,
+                    "index": company_index,
                 },
                 style={"margin-left": "30px"},
             ),
@@ -426,6 +510,12 @@ def hide_graph(n_clicks, graph_container_class):
 def update_children_checkbox(checkbox_value, options):
     if not checkbox_value:
         return checkbox_value
+
+    company = checkbox_value[0]
+    if company in SELECTED_COMPANIES:
+        SELECTED_COMPANIES.remove(company)
+    else:
+        SELECTED_COMPANIES.add(company)
     return [option["value"] for option in options]
 
 
@@ -439,7 +529,7 @@ def update_children_checkbox(checkbox_value, options):
 def toggle_lin_log_btn(*args):
     lin_class = "lin-log-btn hoverable-btn"
     log_class = "lin-log-btn hoverable-btn"
-    if dash.ctx.triggered_id == "lin-btn":
+    if ctx.triggered_id == "lin-btn":
         lin_class += " active"
     else:
         log_class += " active"
@@ -451,43 +541,72 @@ def toggle_lin_log_btn(*args):
     State("stock-graph", "figure"),
     Input("date-picker-range", "start_date"),
     Input("date-picker-range", "end_date"),
-    Input("lin-btn", "n_clicks"),
-    Input("log-btn", "n_clicks"),
+    Input({"type": "symbol-checkbox", "index": ALL}, "value"),
+    State({"type": "symbol-checkbox", "index": ALL}, "options"),
     Input("graph-option-polyline", "n_clicks"),
     Input("graph-option-candles", "n_clicks"),
     Input("graph-option-trash-can", "n_clicks"),
+    Input("lin-btn", "n_clicks"),
+    Input("log-btn", "n_clicks"),
     prevent_initial_call=True,
 )
 def update_graph_polyline(
-    current_fig, start_date, end_date, lin_clicks, log_clicks, *args
+    fig,
+    start_date,
+    end_date,
+    svalues,
+    soptions,
+    polyline_clicks,
+    candlestick_clicks,
+    *args,
 ):
-    selected_fig = current_fig
+    # Handle plotly bug when converting fig to go.Figure
+    if "rangeslider" in fig["layout"]["xaxis"]:
+        del fig["layout"]["xaxis"]["rangeslider"]["yaxis"]
+    fig = go.Figure(fig)
 
-    if dash.ctx.triggered_id == "lin-btn":
-        selected_fig["layout"]["yaxis"]["type"] = "linear"
-    elif dash.ctx.triggered_id == "log-btn":
-        selected_fig["layout"]["yaxis"]["type"] = "log"
+    if (
+        isinstance(ctx.triggered_id, dict)
+        and ctx.triggered_id["type"] == "symbol-checkbox"
+    ):
+        global STOCKS
 
-    id_prefix = "graph-option-"
-    if dash.ctx.triggered_id == id_prefix + "polyline":
-        selected_fig = add_or_update_trace(selected_fig, "polyline")
-    elif dash.ctx.triggered_id == id_prefix + "candles":
-        selected_fig = add_or_update_trace(selected_fig, "candles")
-    elif dash.ctx.triggered_id == id_prefix + "trash-can":
-        selected_fig = go.Figure(layout=BASIC_FIG_LAYOUT)  # Reset graph
-        selected_fig = selected_fig.to_dict()
-    elif "date-picker-range" not in dash.ctx.triggered_id:
+        # Get the checked/unchecked symbol
+        idx = ctx.triggered_id["index"]
+        soptions = soptions[idx]
+        svalues = svalues[idx]
+        symbol = soptions[0]["value"]
+
+        if not svalues:
+            # If symbol is unchecked, remove it from the figure
+            fig.update_traces(visible=False, selector=dict(name=symbol))
+        elif symbol in STOCKS.columns:
+            # If trace is already in the figure, update it
+            fig.update_traces(visible=True, selector=dict(name=symbol))
+        else:
+            visible = polyline_clicks is not None and polyline_clicks % 2 == 1
+            # Fetch the stock data from the database and add it to the figure
+            fig = add_new_stock(fig, symbol, visible)
+    elif ctx.triggered_id == "lin-btn":
+        fig.update_layout(yaxis_type="linear")
+    elif ctx.triggered_id == "log-btn":
+        fig.update_layout(yaxis_type="log")
+    elif ctx.triggered_id == "graph-option-polyline":
+        is_visible = polyline_clicks % 2 == 1
+        fig.update_traces(visible=is_visible, selector=dict(type="scatter"))
+    elif ctx.triggered_id == "graph-option-candles":
+        is_visible = candlestick_clicks % 2 == 1
+        fig.update_traces(visible=is_visible, selector=dict(type="candlestick"))
+    elif ctx.triggered_id == "graph-option-trash-can":
+        fig = go.Figure(layout=BASIC_FIG_LAYOUT)  # Reset graph
+    else:
         print("Warning: No graph option selected")
 
     # Update time range
     if start_date and end_date:
-        if "date-picker-range" in dash.ctx.triggered_id:
-            selected_fig = Patch()
-        selected_fig["layout"]["xaxis"]["type"] = "date"
-        selected_fig["layout"]["xaxis"]["range"][0] = start_date
-        selected_fig["layout"]["xaxis"]["range"][1] = end_date
+        fig.update_layout(xaxis=dict(type="date", range=[start_date, end_date]))
 
-    return selected_fig
+    return fig
 
 
 @app.callback(
@@ -496,16 +615,15 @@ def update_graph_polyline(
     prevent_initial_call=True,
 )
 def update_company_selection(company):
-    matches = get_close_matches(
-        company, mock_companies.keys(), n=len(mock_companies), cutoff=0.5
-    )
+    unique_companies = COMPANIES["name"].str.lower().unique()
+    matches = get_close_matches(company, unique_companies, n=5, cutoff=0.5)
     children = []
     if not matches:
         return children
 
-    for company in matches:
-        symbols = mock_companies[company]
-        html_details = create_company_details(company, symbols)
+    for i, company in enumerate(matches):
+        symbols = COMPANIES.loc[COMPANIES["name"] == company.upper(), "symbol"].values
+        html_details = create_company_details(company, i, symbols)
         children.append(html_details)
 
     return children
@@ -517,7 +635,7 @@ def update_company_selection(company):
     Input("save-btn", "n_clicks"),
     prevent_initial_call=True,
 )
-def func(fig, n_clicks):
+def save_graph(fig, *args):
     # Due to a bug in plotly, rangeslider on yaxis must be removed to convert fig to go.Figure
     if "rangeslider" in fig["layout"]["xaxis"]:
         del fig["layout"]["xaxis"]["rangeslider"]["yaxis"]
@@ -526,6 +644,29 @@ def func(fig, n_clicks):
     encoded_image = base64.b64encode(img_bytes).decode()
     return dict(base64=True, content=encoded_image, filename="plot.png")
 
+
+@app.callback(
+    Output("dummy-div", "children"),
+    Input("market-selection", "value"),
+    prevent_initial_call=True,
+)
+def update_companies(market_id):
+    if not market_id:
+        raise dash.exceptions.PreventUpdate
+
+    # Query the database for the companies in the selected market
+    query = f"SELECT id, name, symbol FROM companies WHERE mid = {market_id}"
+    df_query = pd.read_sql_query(query, engine)
+
+    # Concatenate the new companies with the existing ones
+    global COMPANIES
+    COMPANIES = pd.concat([COMPANIES, df_query], ignore_index=True)
+
+    # Nothing to output
+    raise dash.exceptions.PreventUpdate
+
+
+# -- Clientside callbacks
 
 clientside_callback(
     ClientsideFunction(namespace="clientside", function_name="toggle_full_screen"),

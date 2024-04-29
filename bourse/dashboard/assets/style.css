@@ -215,15 +215,31 @@ nav {
     overflow-y: auto;
 }
 
-.company-selection-container {
+#graph-selection-container {
     grid-area: graph_selection;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    background-color: white;
+    gap: 30px;
+    padding: 15px 20px;
+    border-top-left-radius: 5px;
+}
+
+#market-selection {
+    width: 90%;
+
+}
+
+#market-selection-container {
+    display: grid;
+    grid-template-rows: auto auto;
+    gap: 20px;
+}
+
+#company-selection-container {
     display: grid;
     grid-template-rows: auto auto minmax(400px, 1fr);
     gap: 25px;
-    padding: 15px 20px;
-    height: 100%;
-    background-color: white;
-    border-top-left-radius: 5px;
 }
 
 .company-search-bar {

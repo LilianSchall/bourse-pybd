@@ -3,16 +3,21 @@ import numpy as np
 import sklearn
 import dateutil
 import os
-from multiprocessing import get_context, Pool
+from multiprocessing import get_context
 
 import timescaledb_model as tsdb
 from mylogging import getLogger
 
-db = tsdb.TimescaleStockMarketModel('bourse', 'ricou', 'db', 'monmdp')        # inside docker
-# db = tsdb.TimescaleStockMarketModel('bourse', 'ricou', 'localhost', 'monmdp') # outside docker
+# db = tsdb.TimescaleStockMarketModel('bourse', 'ricou', 'db', 'monmdp')        # inside docker
+db = tsdb.TimescaleStockMarketModel('bourse', 'ricou', 'localhost', 'monmdp') # outside docker
 companies_save = None 
 comp_batch = None
 stock_batch = None
+
+day_batch = []
+daystock_batch = []
+
+CPU_COUNT = os.cpu_count()
 
 log = getLogger(__name__)
 
@@ -58,32 +63,44 @@ def process_stocks(df: pd.DataFrame | pd.Series):
     stocks["value"] = stocks["value"]\
         .str.replace("\([a-zA-Z]\)| ", "", regex=True) 
     stocks["value"] = stocks["value"].astype(float)
-    # db.df_write(stocks, "stocks")
     return stocks
 
-def concat_df(companies, stocks):
+def concat_companies(companies):
+    if len(companies) == 0:
+        return
     global comp_batch
-    global stock_batch
 
     if comp_batch is None:
         comp_batch = [companies]
-        # comp_batch = companies
     else:
-        #comp_batch = pd.concat([comp_batch, companies])
         comp_batch.append(companies)
 
+def concat_stocks(stocks):
+    if len(stocks) == 0:
+        return
+    global stock_batch
     if stock_batch is None:
         stock_batch = [stocks]
     else:
-        # stock_batch = pd.concat([stock_batch, stocks])
         stock_batch.append(stocks)
+    day_batch.append(stocks)
+
+def concat_daystocks(daystocks):
+    global daystock_batch
+    if daystock_batch is None:
+        daystock_batch = [daystocks]
+    else:
+        daystock_batch.append(daystocks)
+
+
 
 def process_dataframe(df: pd.DataFrame | pd.Series, nb_companies: int):
     # companies, stocks, daystocks, file_done, tags
     companies, nb_companies = process_companies(df, nb_companies)
     stocks = process_stocks(df)
 
-    concat_df(companies, stocks)
+    concat_stocks(stocks)
+    concat_companies(companies)
 
     return nb_companies
 
@@ -105,9 +122,16 @@ def commit_companies(df):
 
 def commit_stocks(df):
     db.df_write(df, "stocks")
-    
 
-def store_file(filepath, nb_companies, nb_files_processed):
+def commit_daystocks(df):
+    db.df_write(df, "daystocks")
+
+def store_file(filepath, nb_companies, prev_date, previous_alias):
+    global comp_batch
+    global stock_batch
+    global daystock_batch
+    global day_batch
+
     filename = os.path.basename(filepath)
     if db.is_file_done(filename):
         log.debug("File has already been processed")
@@ -118,33 +142,56 @@ def store_file(filepath, nb_companies, nb_files_processed):
     market = convert_generator_to_df(db.df_query(f"SELECT id FROM markets WHERE alias = '{alias}'"))
     df["mid"] = market.iloc[0]["id"]
     df["date"] = date
-
-    nb_companies = process_dataframe(df, nb_companies)
-    if nb_files_processed % 1000 == 0 and nb_files_processed != 0:
-        global comp_batch
-        global stock_batch
-        log.debug(f"Committing {1000} files to db")
+    
+    #if nb_files_processed % 100 == 0 and nb_files_processed != 0:
+    if date.date() != prev_date and prev_date != None:
+        log.debug(f"Group by {len(day_batch)} for daystocks")
         #db.df_write(comp_batch, "companies")
         #db.df_write(stock_batch, "stocks")
-        with get_context("spawn").Pool(12) as p:
+        daystocks = pd.concat(day_batch, ignore_index=False)
+        daystocks = daystocks.groupby(['cid']).agg(date=pd.NamedAgg(column='value', aggfunc='first'),
+                                                   open=pd.NamedAgg(column='value', aggfunc='first'),
+                                                   close=pd.NamedAgg(column='value', aggfunc='last'),
+                                                   high=pd.NamedAgg(column='value', aggfunc='max'),
+                                                   low=pd.NamedAgg(column='value', aggfunc='min'),
+                                                   #volume=pd.NamedAgg(column='volume', aggfunc='sum'),
+        )
+        daystocks['date'] = prev_date
+        concat_daystocks(daystocks)
+        day_batch = []
+
+
+    # if we have 14 days daystocks
+    # or we have changed another market or year to process
+    if len(daystock_batch) == CPU_COUNT or\
+    (prev_date == None and alias != previous_alias and previous_alias != ""):
+        log.debug(f"Committing {len(stock_batch)} files to db")
+        with get_context("spawn").Pool(CPU_COUNT) as p:
             p.map(commit_companies, comp_batch)
-
-        with get_context("spawn").Pool(12) as p:
             p.map(commit_stocks, stock_batch)
-        comp_batch, stock_batch = None, None
+            p.map(commit_daystocks, daystock_batch)
+            comp_batch, stock_batch, daystock_batch = None, None, []
 
-    return nb_companies 
+    nb_companies = process_dataframe(df, nb_companies)
 
-def process_files(dir, nb_companies=0, nb_files_processed=0):
+
+    return nb_companies, date.date(), alias
+
+def process_files(dir, nb_companies=0, nb_files_processed=0, previous_alias=""):
+    log.debug(dir)
     for root, dirs, files in os.walk(dir):
-        for file in files:
-            nb_companies = store_file(os.path.join(root, file),
-                                      nb_companies,
-                                      nb_files_processed)
+        prev_date = None
+        for file in sorted(files):
+            nb_companies, prev_date, previous_alias = store_file(
+                os.path.join(root, file),
+                nb_companies,
+                prev_date,
+                previous_alias
+            )
             nb_files_processed += 1
             if nb_files_processed % 10 == 0:
                 log.debug(nb_files_processed)
-        for dir in dirs:
+        for dir in sorted(dirs):
             nb_files_processed, nb_companies = process_files(dir, nb_companies=0, nb_files_processed=nb_files_processed)
     return nb_files_processed, nb_companies
 

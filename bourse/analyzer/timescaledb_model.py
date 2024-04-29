@@ -118,6 +118,7 @@ class TimescaleStockMarketModel:
             cursor.execute("INSERT INTO markets (id, name, alias) VALUES (8,'Paris compartiment B','compB');")
             cursor.execute("INSERT INTO markets (id, name, alias) VALUES (9,'Bourse Allemande','xetra');")
             cursor.execute("INSERT INTO markets (id, name, alias) VALUES (10,'Bruxelle','bruxelle');")
+            cursor.execute("INSERT INTO markets (id, name, alias) VALUES (11,'PEA-PME','peapme');")
         except Exception as e:
             self.logger.exception('SQL error: %s' % e)
         self.__connection.commit()
@@ -234,11 +235,11 @@ class TimescaleStockMarketModel:
         else:
             return 0
 
-    def is_file_done(name):
+    def is_file_done(self, name):
         '''
         Check if a file has already been included in the DB
         '''
-        return  self.raw_query("SELECT EXISTS ( SELECT 1 FROM file_done WHERE nom = '%s' );" % name)
+        return  self.raw_query("SELECT EXISTS ( SELECT 1 FROM file_done WHERE name = '%s' );" % name)[0][0]
 
 
 #

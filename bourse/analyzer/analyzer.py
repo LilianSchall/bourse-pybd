@@ -3,13 +3,13 @@ import numpy as np
 import sklearn
 import dateutil
 import os
-from multiprocessing import get_context, Pool
+from multiprocessing import get_context
 
 import timescaledb_model as tsdb
 from mylogging import getLogger
 
-db = tsdb.TimescaleStockMarketModel('bourse', 'ricou', 'db', 'monmdp')        # inside docker
-# db = tsdb.TimescaleStockMarketModel('bourse', 'ricou', 'localhost', 'monmdp') # outside docker
+# db = tsdb.TimescaleStockMarketModel('bourse', 'ricou', 'db', 'monmdp')        # inside docker
+db = tsdb.TimescaleStockMarketModel('bourse', 'ricou', 'localhost', 'monmdp') # outside docker
 companies_save = None 
 comp_batch = None
 stock_batch = None
@@ -128,12 +128,6 @@ def store_file(filepath, nb_companies, nb_files_processed, prev_date):
         log.debug(f"Committing {len(stock_batch)} files to db")
         #db.df_write(comp_batch, "companies")
         #db.df_write(stock_batch, "stocks")
-        with get_context("spawn").Pool(12) as p:
-            p.map(commit_companies, comp_batch)
-
-        with get_context("spawn").Pool(12) as p:
-            p.map(commit_stocks, stock_batch)
-
         daystocks = pd.concat(stock_batch, ignore_index=False)
         daystocks = daystocks.groupby(['cid']).agg(date=pd.NamedAgg(column='value', aggfunc='first'),
                                                    open=pd.NamedAgg(column='value', aggfunc='first'),
@@ -145,8 +139,10 @@ def store_file(filepath, nb_companies, nb_files_processed, prev_date):
         daystocks['date'] = prev_date
 
         with get_context("spawn").Pool(12) as p:
+            p.map(commit_companies, comp_batch)
+            p.map(commit_stocks, stock_batch)
             p.map(commit_daystocks, np.array_split(daystocks, 12))
-        
+
         comp_batch, stock_batch = None, None
 
     nb_companies = process_dataframe(df, nb_companies)

@@ -81,7 +81,7 @@ nav {
 }
 
 #stock-graph {
-    padding: 5px;
+    padding: 15px;
     overflow: auto;
 }
 
@@ -227,7 +227,6 @@ nav {
 
 #market-selection {
     width: 90%;
-
 }
 
 #market-selection-container {
@@ -238,7 +237,7 @@ nav {
 
 #company-selection-container {
     display: grid;
-    grid-template-rows: auto auto minmax(400px, 1fr);
+    grid-template-rows: auto auto minmax(300px, 1fr);
     gap: 25px;
 }
 

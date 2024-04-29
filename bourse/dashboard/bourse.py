@@ -57,6 +57,22 @@ BASIC_FIG_LAYOUT = dict(
     yaxis=dict(type="linear"),
 )
 
+GRAPH_CONFIG = dict(
+    displaylogo=False,
+    modeBarButtonsToRemove=[
+        "sendDataToCloud",
+        "pan2d",
+        "zoom2d",
+        "zoomIn2d",
+        "zoomOut2d",
+        "resetScale2d",
+        "autoScale2d",
+        "toImage",
+    ],
+    scrollZoom=True,
+    # editable=True,
+)
+
 # -- Data
 df = pd.read_csv(
     "https://raw.githubusercontent.com/plotly/datasets/master/finance-charts-apple.csv"
@@ -208,6 +224,7 @@ app.layout = html.Div(
                         dcc.Graph(
                             id="stock-graph",
                             figure=go.Figure(layout=BASIC_FIG_LAYOUT),
+                            config=GRAPH_CONFIG,
                         ),
                         html.Div(
                             [
@@ -613,12 +630,11 @@ def update_selected_symbol(symbols_value, soptions):
     Output("log-btn", "className"),
     Input("lin-btn", "n_clicks"),
     Input("log-btn", "n_clicks"),
-    prevent_initial_call=True,
 )
 def toggle_lin_log_btn(*args):
     lin_class = "lin-log-btn hoverable-btn"
     log_class = "lin-log-btn hoverable-btn"
-    if ctx.triggered_id == "lin-btn":
+    if ctx.triggered_id is None or ctx.triggered_id == "lin-btn":
         lin_class += " active"
     else:
         log_class += " active"

@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 import sqlalchemy
 from dash import ClientsideFunction, Patch, clientside_callback, ctx, dcc, html
 from dash.dependencies import ALL, MATCH, Input, Output, State
+from dateutil.relativedelta import relativedelta
 
 external_stylesheets = [dbc.themes.BOOTSTRAP]
 
@@ -215,8 +216,11 @@ app.layout = html.Div(
                                         html.Div(
                                             [
                                                 html.Button(
-                                                    [date],
-                                                    id=f"fixed-date-{date}",
+                                                    [date.upper()],
+                                                    id={
+                                                        "type": "fixed-date-btn",
+                                                        "index": date,
+                                                    },
                                                     className="fixed-date-btn hoverable-btn",
                                                 )
                                                 for date in fixed_dates
@@ -406,6 +410,34 @@ def add_new_stock(fig, symbol):
     # TODO: USE DAYSTOCKS
 
     return fig
+
+
+def compute_date_range(fixed_date):
+    start_date, end_date = MIN_DATE, MAX_DATE
+    fixed_date = fixed_date.upper()
+    if fixed_date == "1D":
+        start_date = end_date - relativedelta(days=1)
+    elif fixed_date == "5D":
+        start_date = end_date - relativedelta(days=5)
+    elif fixed_date == "1M":
+        start_date = end_date - relativedelta(months=1)
+    elif fixed_date == "3M":
+        start_date = end_date - relativedelta(months=3)
+    elif fixed_date == "6M":
+        start_date = end_date - relativedelta(months=6)
+    elif fixed_date == "YTD":
+        start_date = date(end_date.year, 1, 1)
+    elif fixed_date == "1Y":
+        start_date = end_date - relativedelta(years=1)
+    elif fixed_date == "5Y":
+        start_date = end_date - relativedelta(years=5)
+    elif fixed_date == "ALL":
+        start_date = MIN_DATE
+
+    if start_date < MIN_DATE:
+        start_date = MIN_DATE
+
+    return start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
 
 
 def create_company_details(company, company_index, symbols):
@@ -604,6 +636,7 @@ def toggle_lin_log_btn(*args):
     Input("graph-option-trash-can", "n_clicks"),
     Input("lin-btn", "n_clicks"),
     Input("log-btn", "n_clicks"),
+    Input({"type": "fixed-date-btn", "index": ALL}, "n_clicks"),
     prevent_initial_call=True,
 )
 def update_graph_polyline(
@@ -666,11 +699,17 @@ def update_graph_polyline(
         fig.update_traces(visible=is_visible, selector=dict(type="candlestick"))
     elif ctx.triggered_id == "graph-option-trash-can":
         fig = go.Figure(layout=BASIC_FIG_LAYOUT)  # Reset graph
-    else:
-        print("Warning: No graph option selected")
 
     # Update time range
     if start_date and end_date:
+        fig.update_layout(xaxis=dict(type="date", range=[start_date, end_date]))
+
+    if (
+        isinstance(ctx.triggered_id, dict)
+        and ctx.triggered_id["type"] == "fixed-date-btn"
+    ):
+        fixed_date = ctx.triggered_id["index"]
+        start_date, end_date = compute_date_range(fixed_date)
         fig.update_layout(xaxis=dict(type="date", range=[start_date, end_date]))
 
     return fig

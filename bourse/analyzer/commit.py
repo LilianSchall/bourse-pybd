@@ -58,6 +58,8 @@ class Committer:
              alias != prev_alias and
              prev_alias != ""):
 
+            proc.clean_stocks(self.pool_size)
+
             self.log.debug(f"Committing {len(proc.stocks_batch)} files to db")
             with get_context("spawn").Pool(self.pool_size) as p:
                 self.log.info("..........")

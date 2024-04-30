@@ -380,6 +380,83 @@ app.layout = html.Div(
 
 
 # -- Functions
+def fig_contains_symbol_trace(fig, symbol):
+    for trace in fig["data"]:
+        if symbol in trace["name"]:
+            return True
+    return False
+
+
+def add_all_traces(fig, symbol):
+    # - Add the symbol polyline trace to the figure
+    fig.add_trace(
+        go.Scatter(
+            x=STOCKS.index,
+            y=STOCKS[symbol],
+            mode="lines",
+            name=symbol,
+            visible=False,
+        )
+    )
+
+    # - Add the symbol candlestick trace to the figure
+    fig.add_trace(
+        go.Candlestick(
+            x=DAYSTOCKS.index,
+            open=DAYSTOCKS[symbol]["open"],
+            close=DAYSTOCKS[symbol]["close"],
+            high=DAYSTOCKS[symbol]["high"],
+            low=DAYSTOCKS[symbol]["low"],
+            name=symbol,
+            visible=False,
+        )
+    )
+
+    # - Add the symbol bollinger trace to the figure
+    WINDOW = 30
+    sma_df = DAYSTOCKS[symbol]["close"].rolling(WINDOW).mean()
+    std_df = DAYSTOCKS[symbol]["close"].rolling(WINDOW).std(ddof=0)
+
+    # Moving Average
+    fig.add_trace(
+        go.Scatter(
+            x=DAYSTOCKS.index,
+            y=sma_df,
+            line_color="black",
+            name=f"bollinger-{symbol}",
+            visible=False,
+        ),
+    )
+
+    # Upper Bound
+    fig.add_trace(
+        go.Scatter(
+            x=DAYSTOCKS.index,
+            y=sma_df + (std_df * 2),
+            line_color="gray",
+            line={"dash": "dash"},
+            name=f"bollinger-{symbol}",
+            opacity=0.5,
+            visible=False,
+        ),
+    )
+
+    # Lower Bound fill in between with parameter 'fill': 'tonexty'
+    fig.add_trace(
+        go.Scatter(
+            x=DAYSTOCKS.index,
+            y=sma_df - (std_df * 2),
+            line_color="gray",
+            line={"dash": "dash"},
+            fill="tonexty",
+            name=f"bollinger-{symbol}",
+            opacity=0.5,
+            visible=False,
+        ),
+    )
+    return fig
+
+
 def add_new_stock(fig, symbol):
     global STOCKS, DAYSTOCKS
 
@@ -422,72 +499,7 @@ def add_new_stock(fig, symbol):
     # Concatenate the new daystocks with the existing ones
     DAYSTOCKS = pd.concat([DAYSTOCKS, daystocks_query_df], axis=1).sort_index()
 
-    # -- Add the symbol polyline trace to the figure
-    fig.add_trace(
-        go.Scatter(
-            x=STOCKS.index,
-            y=STOCKS[symbol],
-            mode="lines",
-            name=symbol,
-            visible=False,
-        )
-    )
-
-    # -- Add the symbol candlestick trace to the figure
-    fig.add_trace(
-        go.Candlestick(
-            x=DAYSTOCKS.index,
-            open=DAYSTOCKS[symbol]["open"],
-            close=DAYSTOCKS[symbol]["close"],
-            high=DAYSTOCKS[symbol]["high"],
-            low=DAYSTOCKS[symbol]["low"],
-            name=symbol,
-            visible=False,
-        )
-    )
-
-    # -- Add the symbol bollinger trace to the figure
-    WINDOW = 30
-    sma_df = DAYSTOCKS[symbol]["close"].rolling(WINDOW).mean()
-    std_df = DAYSTOCKS[symbol]["close"].rolling(WINDOW).std(ddof=0)
-
-    # Moving Average
-    fig.add_trace(
-        go.Scatter(
-            x=DAYSTOCKS.index,
-            y=sma_df,
-            line_color="black",
-            name=f"bollinger-{symbol}",
-            visible=False,
-        ),
-    )
-
-    # Upper Bound
-    fig.add_trace(
-        go.Scatter(
-            x=DAYSTOCKS.index,
-            y=sma_df + (std_df * 2),
-            line_color="gray",
-            line={"dash": "dash"},
-            name=f"bollinger-{symbol}",
-            opacity=0.5,
-            visible=False,
-        ),
-    )
-
-    # Lower Bound fill in between with parameter 'fill': 'tonexty'
-    fig.add_trace(
-        go.Scatter(
-            x=DAYSTOCKS.index,
-            y=sma_df - (std_df * 2),
-            line_color="gray",
-            line={"dash": "dash"},
-            fill="tonexty",
-            name=f"bollinger-{symbol}",
-            opacity=0.5,
-            visible=False,
-        ),
-    )
+    fig = add_all_traces(fig, symbol)
     return fig
 
 
@@ -579,7 +591,7 @@ def create_company_details(company, company_index, symbols):
     prevent_initial_call=True,
 )
 def disable_input_company(market_id, trash_can_clicks):
-    reset_input = market_id is None or trash_can_clicks is None
+    reset_input = market_id is None or trash_can_clicks is not None
     if reset_input:
         global SELECTED_COMPANIES, SELECTED_SYMBOLS
         SELECTED_COMPANIES, SELECTED_SYMBOLS = set(), set()
@@ -740,6 +752,8 @@ def update_graph_polyline(
             if symbol not in STOCKS.columns:
                 # Fetch the stock data from the database and add it to the figure
                 fig = add_new_stock(fig, symbol)
+            elif not fig_contains_symbol_trace(fig, symbol):
+                fig = add_all_traces(fig, symbol)
 
             is_poly_visible = polyline_clicks is not None and polyline_clicks % 2 == 1
             is_candle_visible = (

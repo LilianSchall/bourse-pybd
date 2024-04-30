@@ -1,16 +1,17 @@
-from multiprocessing import get_context
-
-import timescaledb_model as tsdb
 import os
-
-from processor import Processor
 from datetime import datetime
 from itertools import repeat
+from multiprocessing import get_context
 
 import pandas as pd
+import timescaledb_model as tsdb
+from processor import Processor
 
 # db = tsdb.TimescaleStockMarketModel('bourse', 'ricou', 'db', 'monmdp')        # inside docker
-db = tsdb.TimescaleStockMarketModel('bourse', 'ricou', 'localhost', 'monmdp') # outside docker
+db = tsdb.TimescaleStockMarketModel(
+    "bourse", "ricou", "localhost", "monmdp"
+)  # outside docker
+
 
 class Committer:
     @staticmethod
@@ -25,39 +26,29 @@ class Committer:
     def commit_daystocks(df: pd.DataFrame):
         db.df_write(df, "daystocks")
 
-
-    def __init__(self,
-                 log,
-                 pool_size=os.cpu_count()
-                 ):
+    def __init__(self, log, pool_size=os.cpu_count()):
         self.pool_size = pool_size
         self.log = log
         self.db = db
 
-
     def __convert_generator_to_df(self, gen):
-            dflist = []
-            for gen in gen:
-                dflist.append(gen)
-            df = pd.concat(dflist)
-            return df
+        dflist = []
+        for gen in gen:
+            dflist.append(gen)
+        df = pd.concat(dflist)
+        return df
 
     def get_market(self, alias: str):
         return self.__convert_generator_to_df(
             db.df_query(f"SELECT id FROM markets WHERE alias = '{alias}'")
         )
 
-    def commit_if_needed(self, 
-                         proc:       Processor,
-                         prev_date:  datetime,
-                         prev_alias: str,
-                         alias:      str
-                         ):
-        if len(proc.daystocks_batch) == self.pool_size or\
-            (prev_date == None and
-             alias != prev_alias and
-             prev_alias != ""):
-
+    def commit_if_needed(
+        self, proc: Processor, prev_date: datetime, prev_alias: str, alias: str
+    ):
+        if len(proc.daystocks_batch) == self.pool_size or (
+            prev_date == None and alias != prev_alias and prev_alias != ""
+        ):
             proc.clean_stocks(self.pool_size)
 
             self.log.debug(f"Committing {len(proc.stocks_batch)} files to db")

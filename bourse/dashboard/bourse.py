@@ -59,12 +59,13 @@ GRAPH_CONFIG = dict(
     displaylogo=False,
     modeBarButtonsToRemove=[
         "sendDataToCloud",
-        "pan2d",
         "zoom2d",
         "zoomIn2d",
         "zoomOut2d",
         "resetScale2d",
         "autoScale2d",
+        "lasso2d",
+        "select2d",
         "toImage",
     ],
     scrollZoom=True,
@@ -81,10 +82,10 @@ table_df = pd.DataFrame(
         "date": pd.date_range(start="2021-01-01", periods=8).strftime("%Y-%m-%d"),
         "symbol": ["1rAAF", "SYM2", "SYM2", "SYM2", "SYM3", "SYM3", "SYM4", "SYM5"],
         "change": [-0.1, 0.2, 0.3, -0.4, 0.5, 0.6, 0.7, 0.8],
-        "min": [300, 400, 500, 600, 700, 800, 900, 1000],
-        "max": [400, 500, 600, 700, 800, 900, 1000, 1100],
         "open": [350, 450, 550, 650, 750, 850, 950, 1050],
         "close": [380, 480, 580, 680, 780, 880, 980, 1080],
+        "high": [400, 500, 600, 700, 800, 900, 1000, 1100],
+        "low": [300, 400, 500, 600, 700, 800, 900, 1000],
         "mean": [350, 450, 550, 650, 750, 850, 950, 1050],
         "std_dev": [20, 30, 40, 50, 60, 70, 80, 90],
     }
@@ -107,10 +108,10 @@ columnDefs = [
         cellRenderer="stockLink",
     ),
     dict(headerName="Change %", field="change", cellRenderer="colorRenderer"),
-    dict(headerName="Min", field="min"),
-    dict(headerName="Max", field="max"),
     dict(headerName="Open", field="open"),
     dict(headerName="Close", field="close"),
+    dict(headerName="High", field="high"),
+    dict(headerName="Low", field="low"),
     dict(headerName="Mean", field="mean"),
     dict(headerName="Std deviation", field="std_dev"),
 ]
@@ -121,12 +122,9 @@ MARKETS = pd.read_sql_query(query, engine)
 
 # Empty dataframe to store the companies and their symbols
 COMPANIES = pd.DataFrame(columns=["id", "name", "symbol"])
-SELECTED_COMPANIES = SELECTED_SYMBOLS = set()
+SELECTED_COMPANIES, SELECTED_SYMBOLS = set(), set()
 
-DAYSTOCKS = pd.DataFrame(
-    columns=["date", "cid", "open", "close", "high", "low", "volume"]
-)
-STOCKS = pd.DataFrame()
+DAYSTOCKS, STOCKS = pd.DataFrame(), pd.DataFrame()
 
 fixed_dates = ["1D", "5D", "1M", "3M", "6M", "YTD", "1Y", "5Y", "ALL"]
 
@@ -136,6 +134,7 @@ graph_options_svg = [
     "bx-cross",
     "candles",
     "polyline",
+    "area-chart",
     "trash-can",
 ]
 
@@ -286,7 +285,7 @@ app.layout = html.Div(
                                 dag.AgGrid(
                                     id="table",
                                     columnDefs=columnDefs,
-                                    rowData=table_df.to_dict("records"),
+                                    rowData=[],
                                     columnSize="sizeToFit",
                                     dashGridOptions={
                                         "pagination": True,
@@ -382,28 +381,48 @@ app.layout = html.Div(
 
 # -- Functions
 def add_new_stock(fig, symbol):
-    global STOCKS
+    global STOCKS, DAYSTOCKS
 
     # Get company id from COMPANIES
     cid = COMPANIES.loc[COMPANIES["symbol"] == symbol, "id"].values[0]
 
     # Query all stocks with cid
-    query = f"SELECT date, value FROM stocks WHERE cid = {cid}"
-    query_df = pd.read_sql_query(query, engine)
+    stocks_query = f"SELECT date, value FROM stocks WHERE cid = {cid}"
+    stocks_query_df = pd.read_sql_query(stocks_query, engine)
+
+    # Query all daystocks with cid
+    daystocks_query = (
+        f"SELECT date, open, close, high, low, volume FROM daystocks WHERE cid = {cid}"
+    )
+    daystocks_query_df = pd.read_sql_query(daystocks_query, engine)
 
     # Set date as index
-    query_df.set_index("date", inplace=True)
+    stocks_query_df.set_index("date", inplace=True)
+    daystocks_query_df.set_index("date", inplace=True)
 
     # Format datetime
-    query_df.index = pd.to_datetime(query_df.index.strftime("%Y-%m-%d %H:%M:%S"))
+    stocks_query_df.index = pd.to_datetime(stocks_query_df.index).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+    daystocks_query_df.index = pd.to_datetime(daystocks_query_df.index).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
 
     # Change value column name to symbol name
-    query_df.rename(columns={"value": symbol}, inplace=True)
+    stocks_query_df.rename(columns={"value": symbol}, inplace=True)
 
-    # Merge query_df with STOCKS
-    STOCKS = pd.concat([STOCKS, query_df], axis=1).sort_index()
+    # Create multiindex columns and set symbol as column name
+    daystocks_query_df.columns = pd.MultiIndex.from_product(
+        [[symbol], ["open", "close", "high", "low", "volume"]]
+    )
 
-    # Add the symbol polyline trace to the figure
+    # Concatenate the new stocks with the existing ones
+    STOCKS = pd.concat([STOCKS, stocks_query_df], axis=1).sort_index()
+
+    # Concatenate the new daystocks with the existing ones
+    DAYSTOCKS = pd.concat([DAYSTOCKS, daystocks_query_df], axis=1).sort_index()
+
+    # -- Add the symbol polyline trace to the figure
     fig.add_trace(
         go.Scatter(
             x=STOCKS.index,
@@ -414,9 +433,61 @@ def add_new_stock(fig, symbol):
         )
     )
 
-    # Add the symbol candlestick trace to the figure
-    # TODO: USE DAYSTOCKS
+    # -- Add the symbol candlestick trace to the figure
+    fig.add_trace(
+        go.Candlestick(
+            x=DAYSTOCKS.index,
+            open=DAYSTOCKS[symbol]["open"],
+            close=DAYSTOCKS[symbol]["close"],
+            high=DAYSTOCKS[symbol]["high"],
+            low=DAYSTOCKS[symbol]["low"],
+            name=symbol,
+            visible=False,
+        )
+    )
 
+    # -- Add the symbol bollinger trace to the figure
+    WINDOW = 30
+    sma_df = DAYSTOCKS[symbol]["close"].rolling(WINDOW).mean()
+    std_df = DAYSTOCKS[symbol]["close"].rolling(WINDOW).std(ddof=0)
+
+    # Moving Average
+    fig.add_trace(
+        go.Scatter(
+            x=DAYSTOCKS.index,
+            y=sma_df,
+            line_color="black",
+            name=f"bollinger-{symbol}",
+            visible=False,
+        ),
+    )
+
+    # Upper Bound
+    fig.add_trace(
+        go.Scatter(
+            x=DAYSTOCKS.index,
+            y=sma_df + (std_df * 2),
+            line_color="gray",
+            line={"dash": "dash"},
+            name=f"bollinger-{symbol}",
+            opacity=0.5,
+            visible=False,
+        ),
+    )
+
+    # Lower Bound fill in between with parameter 'fill': 'tonexty'
+    fig.add_trace(
+        go.Scatter(
+            x=DAYSTOCKS.index,
+            y=sma_df - (std_df * 2),
+            line_color="gray",
+            line={"dash": "dash"},
+            fill="tonexty",
+            name=f"bollinger-{symbol}",
+            opacity=0.5,
+            visible=False,
+        ),
+    )
     return fig
 
 
@@ -502,10 +573,17 @@ def create_company_details(company, company_index, symbols):
 # -- Callbacks
 @app.callback(
     Output("input-company", "disabled"),
+    Output("input-company", "value"),
     Input("market-selection", "value"),
+    Input("graph-option-trash-can", "n_clicks"),
+    prevent_initial_call=True,
 )
-def disable_input_company(market_id):
-    return not market_id
+def disable_input_company(market_id, trash_can_clicks):
+    reset_input = market_id is None or trash_can_clicks is None
+    if reset_input:
+        global SELECTED_COMPANIES, SELECTED_SYMBOLS
+        SELECTED_COMPANIES, SELECTED_SYMBOLS = set(), set()
+    return not market_id, ""
 
 
 @app.callback(
@@ -582,6 +660,8 @@ def update_children_checkbox(company_checkbox_value, coptions, soptions):
     prevent_initial_call=True,
 )
 def update_selected_symbol(symbols_value, soptions):
+    if ctx.triggered_id is None:
+        raise dash.exceptions.PreventUpdate
     idx = ctx.triggered_id["index"]
     symbol = soptions[idx][0]["value"]
     if not symbols_value[idx]:
@@ -589,30 +669,6 @@ def update_selected_symbol(symbols_value, soptions):
     else:
         SELECTED_SYMBOLS.add(symbol)
     return 0
-
-
-# @app.callback(
-#     Output("dummy-div", "n_clicks"),
-#     Input({"type": "symbol-checkbox", "index": ALL}, "value"),
-#     State({"type": "symbol-checkbox", "index": ALL}, "options"),
-#     State({"type": "company-checkbox", "index": ALL}, "options"),
-#     prevent_initial_call=True,
-# )
-# def update_parent_checkbox(symbol_checkbox_value, soptions, coptions):
-#     idx = ctx.triggered_id["index"]
-#     company = coptions[idx][0]["value"]
-#     print(f"SYMBOLS: {symbol_checkbox_value}")
-#     print(f"SOPTIONS: {soptions}")
-#     if symbol_checkbox_value[idx] is None:
-#         return 0
-#     is_all_selected = len(symbol_checkbox_value[idx]) == len(soptions[idx])
-#     if not is_all_selected:
-#         print("REMOVED: ", company)
-#         SELECTED_COMPANIES.discard(company)
-#     else:
-#         print("ADDED: ", company)
-#         SELECTED_COMPANIES.add(company)
-#     return 0
 
 
 @app.callback(
@@ -640,6 +696,7 @@ def toggle_lin_log_btn(*args):
     State({"type": "symbol-checkbox", "index": ALL}, "options"),
     Input("graph-option-polyline", "n_clicks"),
     Input("graph-option-candles", "n_clicks"),
+    Input("graph-option-area-chart", "n_clicks"),
     Input("graph-option-trash-can", "n_clicks"),
     Input("lin-btn", "n_clicks"),
     Input("log-btn", "n_clicks"),
@@ -654,6 +711,7 @@ def update_graph_polyline(
     soptions,
     polyline_clicks,
     candlestick_clicks,
+    bollinger_clicks,
     *args,
 ):
     # Handle plotly bug when converting fig to go.Figure
@@ -675,7 +733,9 @@ def update_graph_polyline(
 
         if not svalues:
             # If symbol is unchecked, remove it from the figure
-            fig.update_traces(visible=False, selector=dict(name=symbol))
+            fig.update_traces(
+                visible=False, selector=lambda trace: symbol in trace["name"]
+            )
         else:
             if symbol not in STOCKS.columns:
                 # Fetch the stock data from the database and add it to the figure
@@ -684,6 +744,9 @@ def update_graph_polyline(
             is_poly_visible = polyline_clicks is not None and polyline_clicks % 2 == 1
             is_candle_visible = (
                 candlestick_clicks is not None and candlestick_clicks % 2 == 1
+            )
+            is_bollinger_visible = (
+                bollinger_clicks is not None and bollinger_clicks % 2 == 1
             )
 
             if is_poly_visible:
@@ -694,18 +757,34 @@ def update_graph_polyline(
                 fig.update_traces(
                     visible=True, selector=dict(name=symbol, type="candlestick")
                 )
+            if is_bollinger_visible:
+                fig.update_traces(
+                    visible=True,
+                    selector=lambda trace: trace["name"] == f"bollinger-{symbol}",
+                )
     elif ctx.triggered_id == "lin-btn":
         fig.update_layout(yaxis_type="linear")
     elif ctx.triggered_id == "log-btn":
         fig.update_layout(yaxis_type="log")
     elif ctx.triggered_id == "graph-option-polyline":
         is_visible = polyline_clicks % 2 == 1
-        fig.update_traces(visible=is_visible, selector=dict(type="scatter"))
+        fig.update_traces(
+            visible=is_visible,
+            selector=lambda trace: trace["type"] == "scatter"
+            and "bollinger" not in trace["name"],
+        )
     elif ctx.triggered_id == "graph-option-candles":
         is_visible = candlestick_clicks % 2 == 1
         fig.update_traces(visible=is_visible, selector=dict(type="candlestick"))
+    elif ctx.triggered_id == "graph-option-area-chart":
+        is_visible = bollinger_clicks % 2 == 1
+        fig.update_traces(
+            visible=is_visible, selector=lambda trace: "bollinger" in trace["name"]
+        )
     elif ctx.triggered_id == "graph-option-trash-can":
         fig = go.Figure(layout=BASIC_FIG_LAYOUT)  # Reset graph
+    elif "date-picker-range" == ctx.triggered_id and not start_date and not end_date:
+        fig.update_layout(xaxis=dict(type="date", range=[MIN_DATE, MAX_DATE]))
 
     # Update time range
     if start_date and end_date:
@@ -728,9 +807,12 @@ def update_graph_polyline(
     prevent_initial_call=True,
 )
 def update_company_selection(company):
+    children = []
+    if not company:
+        return children
+
     unique_companies = COMPANIES["name"].str.lower().unique()
     matches = get_close_matches(company, unique_companies, n=5, cutoff=0.5)
-    children = []
     if not matches:
         return children
 
@@ -774,6 +856,9 @@ def update_companies(market_id):
     # Concatenate the new companies with the existing ones
     global COMPANIES
     COMPANIES = pd.concat([COMPANIES, df_query], ignore_index=True)
+
+    # Remove duplicates on symbols
+    COMPANIES.drop_duplicates(subset="symbol", inplace=True)
 
     # Nothing to output
     raise dash.exceptions.PreventUpdate

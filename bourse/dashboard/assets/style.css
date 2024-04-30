@@ -238,7 +238,7 @@ nav {
 #company-selection-container {
     display: grid;
     grid-template-rows: auto auto minmax(300px, 1fr);
-    gap: 25px;
+    gap: 20px;
 }
 
 .company-search-bar {

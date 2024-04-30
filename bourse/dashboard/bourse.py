@@ -72,6 +72,21 @@ GRAPH_CONFIG = dict(
     # editable=True,
 )
 
+ALIAS_TO_COUNTRY = {
+    "euronx": "europe",
+    "lse": "united-kingdom",
+    "milano": "italy",
+    "dbx": "germany",
+    "mercados": "spain",
+    "amsterdam": "netherlands",
+    "compA": "france",
+    "compB": "france",
+    "xetra": "germany",
+    "bruxelle": "belgium",
+    "peapme": "france",
+}
+
+
 # -- Data
 df = pd.read_csv(
     "https://raw.githubusercontent.com/plotly/datasets/master/finance-charts-apple.csv"
@@ -311,7 +326,7 @@ app.layout = html.Div(
                                             "label": html.Span(
                                                 [
                                                     html.Img(
-                                                        src=f"assets/graph_selection/markets/{markets['alias']}.svg",
+                                                        src=f"assets/graph_selection/markets/{ALIAS_TO_COUNTRY[markets['alias']]}.svg",
                                                         height=30,
                                                         style={
                                                             "display": "inline-block",

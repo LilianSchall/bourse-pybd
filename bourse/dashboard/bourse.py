@@ -111,6 +111,8 @@ columnDefs = [
         field="date",
         cellDataType="dateString",
         pinned="left",
+        filter="agDateColumnFilter",
+        filterParams=dict(filterOptions=["inRange"]),
         cellStyle=dict(fontWeight="500", backgroundColor="rgb(250, 250, 250)"),
     ),
     dict(

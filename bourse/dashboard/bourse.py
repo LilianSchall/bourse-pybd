@@ -123,12 +123,36 @@ columnDefs = [
         cellRenderer="stockLink",
     ),
     dict(headerName="Change %", field="change", cellRenderer="colorRenderer"),
-    dict(headerName="Open", field="open"),
-    dict(headerName="Close", field="close"),
-    dict(headerName="High", field="high"),
-    dict(headerName="Low", field="low"),
-    dict(headerName="Mean", field="mean"),
-    dict(headerName="Std deviation", field="std_dev"),
+    dict(
+        headerName="Open",
+        field="open",
+        valueFormatter=dict(function="d3.format('(.2f')(params.value)"),
+    ),
+    dict(
+        headerName="Close",
+        field="close",
+        valueFormatter=dict(function="d3.format('(.2f')(params.value)"),
+    ),
+    dict(
+        headerName="High",
+        field="high",
+        valueFormatter=dict(function="d3.format('(.2f')(params.value)"),
+    ),
+    dict(
+        headerName="Low",
+        field="low",
+        valueFormatter=dict(function="d3.format('(.2f')(params.value)"),
+    ),
+    dict(
+        headerName="Mean",
+        field="mean",
+        valueFormatter=dict(function="d3.format('(.2f')(params.value)"),
+    ),
+    dict(
+        headerName="Std deviation",
+        field="std_dev",
+        valueFormatter=dict(function="d3.format('(.2f')(params.value)"),
+    ),
 ]
 
 # Fetch all markets from the database
@@ -298,7 +322,7 @@ app.layout = html.Div(
                         html.Div(
                             [
                                 dag.AgGrid(
-                                    id="table",
+                                    id="aggrid-table",
                                     columnDefs=columnDefs,
                                     rowData=[],
                                     columnSize="sizeToFit",
@@ -395,6 +419,27 @@ app.layout = html.Div(
 
 
 # -- Functions
+def get_aggrid_data():
+    global DAYSTOCKS
+
+    if DAYSTOCKS.empty:
+        return []
+
+    aggrid_df = DAYSTOCKS.copy()
+    aggrid_df.reset_index(inplace=True)
+
+    # Add change column
+    aggrid_df["change"] = (aggrid_df["close"] - aggrid_df["open"]) / aggrid_df["open"]
+
+    # Add mean column
+    aggrid_df["mean"] = aggrid_df["close"].rolling(3).mean()
+
+    # Add std_dev column
+    aggrid_df["std_dev"] = aggrid_df["close"].rolling(3).std()
+
+    return aggrid_df.to_dict("records")
+
+
 def fig_contains_symbol_trace(fig, symbol):
     for trace in fig["data"]:
         if symbol in trace["name"]:
@@ -418,10 +463,10 @@ def add_all_traces(fig, symbol):
     fig.add_trace(
         go.Candlestick(
             x=DAYSTOCKS.index,
-            open=DAYSTOCKS[symbol]["open"],
-            close=DAYSTOCKS[symbol]["close"],
-            high=DAYSTOCKS[symbol]["high"],
-            low=DAYSTOCKS[symbol]["low"],
+            open=DAYSTOCKS[DAYSTOCKS["symbol"] == symbol]["open"],
+            close=DAYSTOCKS[DAYSTOCKS["symbol"] == symbol]["close"],
+            high=DAYSTOCKS[DAYSTOCKS["symbol"] == symbol]["high"],
+            low=DAYSTOCKS[DAYSTOCKS["symbol"] == symbol]["low"],
             name=symbol,
             visible=False,
         )
@@ -429,8 +474,10 @@ def add_all_traces(fig, symbol):
 
     # - Add the symbol bollinger trace to the figure
     WINDOW = 30
-    sma_df = DAYSTOCKS[symbol]["close"].rolling(WINDOW).mean()
-    std_df = DAYSTOCKS[symbol]["close"].rolling(WINDOW).std(ddof=0)
+    sma_df = DAYSTOCKS[DAYSTOCKS["symbol"] == symbol]["close"].rolling(WINDOW).mean()
+    std_df = (
+        DAYSTOCKS[DAYSTOCKS["symbol"] == symbol]["close"].rolling(WINDOW).std(ddof=0)
+    )
 
     # Moving Average
     fig.add_trace(
@@ -497,22 +544,20 @@ def add_new_stock(fig, symbol):
         "%Y-%m-%d %H:%M:%S"
     )
     daystocks_query_df.index = pd.to_datetime(daystocks_query_df.index).strftime(
-        "%Y-%m-%d %H:%M:%S"
+        "%Y-%m-%d"
     )
 
     # Change value column name to symbol name
     stocks_query_df.rename(columns={"value": symbol}, inplace=True)
 
-    # Create multiindex columns and set symbol as column name
-    daystocks_query_df.columns = pd.MultiIndex.from_product(
-        [[symbol], ["open", "close", "high", "low", "volume"]]
-    )
+    # Add symbol column to daystocks
+    daystocks_query_df["symbol"] = symbol
 
     # Concatenate the new stocks with the existing ones
     STOCKS = pd.concat([STOCKS, stocks_query_df], axis=1).sort_index()
 
     # Concatenate the new daystocks with the existing ones
-    DAYSTOCKS = pd.concat([DAYSTOCKS, daystocks_query_df], axis=1).sort_index()
+    DAYSTOCKS = pd.concat([DAYSTOCKS, daystocks_query_df], axis=0).sort_index()
 
     fig = add_all_traces(fig, symbol)
     return fig
@@ -828,6 +873,15 @@ def update_graph_polyline(
         fig.update_layout(xaxis=dict(type="date", range=[start_date, end_date]))
 
     return fig
+
+
+@app.callback(
+    Output("aggrid-table", "rowData"),
+    Input("stock-graph", "figure"),
+    prevent_initial_call=True,
+)
+def update_table_data(*arg):
+    return get_aggrid_data()
 
 
 @app.callback(

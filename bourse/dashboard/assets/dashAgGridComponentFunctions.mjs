@@ -10,7 +10,7 @@ dagcomponentfuncs.colorRenderer = function (props) {
             borderRadius: "20px",
             padding: "5px 12px",
         }
-    }, `${value >= 0 ? '↑' : '↓'} ${value.toFixed(2)}%`);
+    }, `${value > 0 ? '↑' : (value < 0 ? '↓' : '')} ${value.toFixed(2)}%`);
 };
 
 dagcomponentfuncs.stockLink = function (props) {

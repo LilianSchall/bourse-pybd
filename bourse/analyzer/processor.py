@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 class Processor:
     def __init__(self, log):
@@ -82,4 +83,20 @@ class Processor:
         self.companies_batch = []
         self.daystocks_batch = []
 
+    def clean_stocks(self, pool_size):
+        stocks = pd.concat(self.stocks_batch, ignore_index=False)
 
+        stocks.reset_index(inplace=True)
+        stocks.sort_values(['cid', 'date'], inplace=True)
+        
+        stocks['day'] = stocks['date'].dt.date
+
+        selected_columns = ['cid', 'volume', 'value', 'day']
+        df1 = stocks[stocks[selected_columns].ne(stocks[selected_columns].shift(1)).any(axis=1)]
+        df2 = stocks[stocks[selected_columns].ne(stocks[selected_columns].shift(-1)).any(axis=1)]
+        stocks = pd.concat([df1, df2.loc[~df2.index.isin(df1.index)]])
+
+        stocks.set_index('cid', drop=True, inplace=True)
+        stocks.drop(columns='day', inplace=True)
+
+        self.stocks_batch = np.array_split(stocks, pool_size)

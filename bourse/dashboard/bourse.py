@@ -5,6 +5,7 @@ from datetime import date
 from difflib import get_close_matches
 
 import dash
+import dash_ag_grid as dag
 import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.graph_objects as go
@@ -45,9 +46,6 @@ server = app.server
 MIN_DATE = date(2019, 1, 1)
 MAX_DATE = date(2023, 12, 29)
 INIT_DATE = date(2021, 1, 1)
-# MIN_DATE = date(2015, 2, 17)
-# MAX_DATE = date(2017, 2, 17)
-# INIT_DATE = date(2016, 1, 1)
 BASIC_FIG_LAYOUT = dict(
     margin=dict(l=0, r=0, t=0, b=30),
     xaxis=dict(
@@ -80,17 +78,42 @@ df = pd.read_csv(
 
 table_df = pd.DataFrame(
     {
-        "Date (in days)": pd.date_range(start="2021-01-01", periods=8).strftime(
-            "%Y-%m-%d"
-        ),
-        "Min": [300, 400, 500, 600, 700, 800, 900, 1000],
-        "Max": [400, 500, 600, 700, 800, 900, 1000, 1100],
-        "Start": [350, 450, 550, 650, 750, 850, 950, 1050],
-        "End": [380, 480, 580, 680, 780, 880, 980, 1080],
-        "Mean": [350, 450, 550, 650, 750, 850, 950, 1050],
-        "Std deviation": [20, 30, 40, 50, 60, 70, 80, 90],
+        "date": pd.date_range(start="2021-01-01", periods=8).strftime("%Y-%m-%d"),
+        "symbol": ["1rAAF", "SYM2", "SYM2", "SYM2", "SYM3", "SYM3", "SYM4", "SYM5"],
+        "change": [-0.1, 0.2, 0.3, -0.4, 0.5, 0.6, 0.7, 0.8],
+        "min": [300, 400, 500, 600, 700, 800, 900, 1000],
+        "max": [400, 500, 600, 700, 800, 900, 1000, 1100],
+        "open": [350, 450, 550, 650, 750, 850, 950, 1050],
+        "close": [380, 480, 580, 680, 780, 880, 980, 1080],
+        "mean": [350, 450, 550, 650, 750, 850, 950, 1050],
+        "std_dev": [20, 30, 40, 50, 60, 70, 80, 90],
     }
 )
+columnDefs = [
+    dict(
+        headerName="Date (in days)",
+        field="date",
+        cellDataType="dateString",
+        pinned="left",
+        cellStyle=dict(fontWeight="500", backgroundColor="rgb(250, 250, 250)"),
+    ),
+    dict(
+        headerName="Symbol",
+        field="symbol",
+        pinned="left",
+        filter="agTextColumnFilter",
+        filterParams=dict(filterOptions=["contains"]),
+        cellStyle=dict(fontWeight="500", backgroundColor="rgb(250, 250, 250)"),
+        cellRenderer="stockLink",
+    ),
+    dict(headerName="Change %", field="change", cellRenderer="colorRenderer"),
+    dict(headerName="Min", field="min"),
+    dict(headerName="Max", field="max"),
+    dict(headerName="Open", field="open"),
+    dict(headerName="Close", field="close"),
+    dict(headerName="Mean", field="mean"),
+    dict(headerName="Std deviation", field="std_dev"),
+]
 
 # Fetch all markets from the database
 query = "SELECT id, alias FROM markets"
@@ -98,40 +121,7 @@ MARKETS = pd.read_sql_query(query, engine)
 
 # Empty dataframe to store the companies and their symbols
 COMPANIES = pd.DataFrame(columns=["id", "name", "symbol"])
-SELECTED_COMPANIES = set()
-SELECTED_SYMBOLS = set()
-
-# Fetch all companies and their symbols from the database
-# query = "SELECT company, symbol FROM companies"
-# companies = pd.read_sql_query(query, engine)
-mock_companies = {
-    "Company A": ["SYM1", "SYM2", "SYM3"],
-    "Company B": ["SYM4", "SYM5"],
-    "Company C": ["SYM6", "SYM7", "SYM8"],
-    "Company D": ["SYM9", "SYM10"],
-    "Company E": ["SYM11", "SYM12", "SYM13"],
-    "Company F": ["SYM14", "SYM15", "SYM16"],
-    "Company G": ["SYM17", "SYM18", "SYM19"],
-    "Company H": ["SYM20", "SYM21", "SYM22"],
-    "Company I": ["SYM23", "SYM24", "SYM25"],
-    "Company J": ["SYM26", "SYM27", "SYM28"],
-    "Company K": ["SYM29", "SYM30", "SYM31"],
-    "Company L": ["SYM32", "SYM33", "SYM34"],
-    "Company M": ["SYM35", "SYM36", "SYM37"],
-    "Company N": ["SYM38", "SYM39", "SYM40"],
-    "Company O": ["SYM41", "SYM42", "SYM43"],
-    "Company P": ["SYM44", "SYM45", "SYM46"],
-    "Company Q": ["SYM47", "SYM48", "SYM49"],
-    "Company R": ["SYM50", "SYM51", "SYM52"],
-    "Company S": ["SYM53", "SYM54", "SYM55"],
-    "Company T": ["SYM56", "SYM57", "SYM58"],
-    "Company U": ["SYM59", "SYM60", "SYM61"],
-    "Company V": ["SYM62", "SYM63", "SYM64"],
-    "Company W": ["SYM65", "SYM66", "SYM67"],
-    "Company X": ["SYM68", "SYM69", "SYM70"],
-    "Company Y": ["SYM71", "SYM72", "SYM73"],
-    "Company Z": ["SYM74", "SYM75", "SYM76"],
-}
+SELECTED_COMPANIES = SELECTED_SYMBOLS = set()
 
 DAYSTOCKS = pd.DataFrame(
     columns=["date", "cid", "open", "close", "high", "low", "volume"]
@@ -146,9 +136,6 @@ graph_options_svg = [
     "bx-cross",
     "candles",
     "polyline",
-    "text",
-    "ruler",
-    "zoom",
     "trash-can",
 ]
 
@@ -296,13 +283,16 @@ app.layout = html.Div(
                         ),
                         html.Div(
                             [
-                                dbc.Table.from_dataframe(
-                                    table_df,
-                                    striped=True,
-                                    hover=True,
-                                    responsive=True,
-                                    size="md",
-                                    class_name="table",
+                                dag.AgGrid(
+                                    id="table",
+                                    columnDefs=columnDefs,
+                                    rowData=table_df.to_dict("records"),
+                                    columnSize="sizeToFit",
+                                    dashGridOptions={
+                                        "pagination": True,
+                                        "paginationPageSize": 20,
+                                    },
+                                    style={"height": "100%", "width": "100%"},
                                 )
                             ],
                             id="table-content",

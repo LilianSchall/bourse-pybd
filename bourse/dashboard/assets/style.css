@@ -282,3 +282,7 @@ nav {
     height: 30px;
     width: auto;
 }
+
+.ag-theme-alpine .ag-header-cell {
+    font-size: 15px;
+}

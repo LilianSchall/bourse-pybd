@@ -10,7 +10,7 @@ import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.graph_objects as go
 import sqlalchemy
-from dash import ClientsideFunction, Patch, clientside_callback, ctx, dcc, html
+from dash import ClientsideFunction, clientside_callback, ctx, dcc, html
 from dash.dependencies import ALL, MATCH, Input, Output, State
 from dateutil.relativedelta import relativedelta
 
@@ -650,7 +650,6 @@ def create_company_details(company, company_index, symbols):
     Output("input-company", "value"),
     Input("market-selection", "value"),
     Input("graph-option-trash-can", "n_clicks"),
-    prevent_initial_call=True,
 )
 def disable_input_company(market_id, trash_can_clicks):
     reset_input = market_id is None or trash_can_clicks is not None

@@ -405,6 +405,43 @@ app.layout = html.Div(
 
 
 # -- Functions
+def update_selected_symbols(svalue, soption):
+    global SELECTED_SYMBOLS, SELECTED_COMPANIES, COMPANIES
+
+    all_symbols = []
+    for option in soption:
+        all_symbols.append(option["value"])
+
+    all_symbols_set = set(all_symbols)
+    current_symbols = all_symbols_set.intersection(SELECTED_SYMBOLS)
+    value_symbols = set(svalue)
+
+    if len(current_symbols) == len(value_symbols):
+        return []
+
+    if len(current_symbols) > len(value_symbols):
+        # Remove unchecked symbols
+        symbols = current_symbols - value_symbols
+        SELECTED_SYMBOLS -= symbols
+
+        # Remove company name if all symbols are unchecked
+        if all_symbols_set.isdisjoint(SELECTED_SYMBOLS):
+            one_symbol = next(iter(all_symbols_set))
+            company = COMPANIES.loc[COMPANIES["symbol"] == one_symbol, "name"].values[0]
+            SELECTED_COMPANIES.discard(company)
+        return symbols
+    else:
+        # Add checked symbols
+        symbols = value_symbols - current_symbols
+        SELECTED_SYMBOLS |= symbols
+
+        # Add company name if all symbols are selected
+        if all_symbols_set.issubset(SELECTED_SYMBOLS):
+            one_symbol = next(iter(all_symbols_set))
+            company = COMPANIES.loc[COMPANIES["symbol"] == one_symbol, "name"].values[0]
+            SELECTED_COMPANIES.add(company)
+
+        return symbols
 
 
 def fig_contains_symbol_trace(fig, symbol):
@@ -664,12 +701,30 @@ def update_market_selection(*args):
     Input("market-selection", "value"),
     Input("graph-option-trash-can", "n_clicks"),
 )
-def disable_input_company(market_id, trash_can_clicks):
-    reset_input = market_id is None or trash_can_clicks is not None
-    if reset_input:
-        global SELECTED_COMPANIES, SELECTED_SYMBOLS
+def disable_input_company(market_id, *args):
+    global SELECTED_COMPANIES, SELECTED_SYMBOLS, COMPANIES
+    # Initial call
+    if ctx.triggered_id is None:
+        return True, ""
+    elif ctx.triggered_id == "graph-option-trash-can":
         SELECTED_COMPANIES, SELECTED_SYMBOLS = set(), set()
-    return not market_id, ""
+        return market_id is None, ""
+    else:
+        SELECTED_COMPANIES, SELECTED_SYMBOLS = set(), set()
+        if market_id is None:
+            COMPANIES = pd.DataFrame(columns=["id", "name", "symbol"])
+            return True, ""
+
+        # Query the database for the companies in the selected market
+        query = f"SELECT id, name, symbol FROM companies WHERE mid = {market_id}"
+        df_query = pd.read_sql_query(query, engine)
+
+        # Concatenate the new companies with the existing ones
+        COMPANIES = pd.concat([COMPANIES, df_query], ignore_index=True)
+
+        # Remove duplicates on symbols
+        COMPANIES.drop_duplicates(subset="symbol", inplace=True)
+        return False, ""
 
 
 @app.callback(
@@ -724,37 +779,14 @@ def hide_graph(n_clicks, graph_container_class):
     prevent_initial_call=True,
 )
 def update_children_checkbox(company_checkbox_value, coptions, soptions):
-    company = coptions[0]["value"]
+    company = coptions[0]["value"].upper()
     symbols = []
     if not company_checkbox_value:
         SELECTED_COMPANIES.discard(company)
-        for option in soptions:
-            SELECTED_SYMBOLS.discard(option["value"])
         return symbols
 
     SELECTED_COMPANIES.add(company)
-    for option in soptions:
-        symbols.append(option["value"])
-        SELECTED_SYMBOLS.add(option["value"])
-    return symbols
-
-
-@app.callback(
-    Output("dummy-div", "n_clicks"),
-    Input({"type": "symbol-checkbox", "index": ALL}, "value"),
-    State({"type": "symbol-checkbox", "index": ALL}, "options"),
-    prevent_initial_call=True,
-)
-def update_selected_symbol(symbols_value, soptions):
-    if ctx.triggered_id is None:
-        raise dash.exceptions.PreventUpdate
-    idx = ctx.triggered_id["index"]
-    symbol = soptions[idx][0]["value"]
-    if not symbols_value[idx]:
-        SELECTED_SYMBOLS.discard(symbol)
-    else:
-        SELECTED_SYMBOLS.add(symbol)
-    return 0
+    return [option["value"] for option in soptions]
 
 
 @app.callback(
@@ -809,47 +841,56 @@ def update_graph_polyline(
         isinstance(ctx.triggered_id, dict)
         and ctx.triggered_id["type"] == "symbol-checkbox"
     ):
-        global STOCKS
+        global STOCKS, SELECTED_SYMBOLS
 
         # Get the checked/unchecked symbol
         idx = ctx.triggered_id["index"]
-        soptions = soptions[idx]
-        svalues = svalues[idx]
-        symbol = soptions[0]["value"]
+        soption = soptions[idx]
+        svalue = svalues[idx]
+        symbols = update_selected_symbols(svalue, soption)
 
-        if not svalues:
-            # If symbol is unchecked, remove it from the figure
+        if not symbols:
+            raise dash.exceptions.PreventUpdate
+
+        if next(iter(symbols)) not in SELECTED_SYMBOLS:
+            # Remove all traces of the unchecked symbols
             fig.update_traces(
-                visible=False, selector=lambda trace: symbol in trace["name"]
+                visible=False,
+                selector=lambda trace: any(
+                    symbol in trace["name"] for symbol in symbols
+                ),
             )
         else:
-            if symbol not in STOCKS.columns:
-                # Fetch the stock data from the database and add it to the figure
-                fig = add_new_stock(fig, symbol)
-            elif not fig_contains_symbol_trace(fig, symbol):
-                fig = add_all_traces(fig, symbol)
+            for symbol in symbols:
+                if symbol not in STOCKS.columns:
+                    # Fetch the stock data from the database and add it to the figure
+                    fig = add_new_stock(fig, symbol)
+                elif not fig_contains_symbol_trace(fig, symbol):
+                    fig = add_all_traces(fig, symbol)
 
-            is_poly_visible = polyline_clicks is not None and polyline_clicks % 2 == 1
-            is_candle_visible = (
-                candlestick_clicks is not None and candlestick_clicks % 2 == 1
-            )
-            is_bollinger_visible = (
-                bollinger_clicks is not None and bollinger_clicks % 2 == 1
-            )
+                is_poly_visible = (
+                    polyline_clicks is not None and polyline_clicks % 2 == 1
+                )
+                is_candle_visible = (
+                    candlestick_clicks is not None and candlestick_clicks % 2 == 1
+                )
+                is_bollinger_visible = (
+                    bollinger_clicks is not None and bollinger_clicks % 2 == 1
+                )
 
-            if is_poly_visible:
-                fig.update_traces(
-                    visible=True, selector=dict(name=symbol, type="scatter")
-                )
-            if is_candle_visible:
-                fig.update_traces(
-                    visible=True, selector=dict(name=symbol, type="candlestick")
-                )
-            if is_bollinger_visible:
-                fig.update_traces(
-                    visible=True,
-                    selector=lambda trace: trace["name"] == f"bollinger-{symbol}",
-                )
+                if is_poly_visible:
+                    fig.update_traces(
+                        visible=True, selector=dict(name=symbol, type="scatter")
+                    )
+                if is_candle_visible:
+                    fig.update_traces(
+                        visible=True, selector=dict(name=symbol, type="candlestick")
+                    )
+                if is_bollinger_visible:
+                    fig.update_traces(
+                        visible=True,
+                        selector=lambda trace: trace["name"] == f"bollinger-{symbol}",
+                    )
     elif ctx.triggered_id == "lin-btn":
         fig.update_layout(yaxis_type="linear")
     elif ctx.triggered_id == "log-btn":
@@ -963,30 +1004,6 @@ def save_graph(fig, *args):
     img_bytes = fig.to_image(format="png")
     encoded_image = base64.b64encode(img_bytes).decode()
     return dict(base64=True, content=encoded_image, filename="plot.png")
-
-
-@app.callback(
-    Output("dummy-div", "children"),
-    Input("market-selection", "value"),
-    prevent_initial_call=True,
-)
-def update_companies(market_id):
-    if not market_id:
-        raise dash.exceptions.PreventUpdate
-
-    # Query the database for the companies in the selected market
-    query = f"SELECT id, name, symbol FROM companies WHERE mid = {market_id}"
-    df_query = pd.read_sql_query(query, engine)
-
-    # Concatenate the new companies with the existing ones
-    global COMPANIES
-    COMPANIES = pd.concat([COMPANIES, df_query], ignore_index=True)
-
-    # Remove duplicates on symbols
-    COMPANIES.drop_duplicates(subset="symbol", inplace=True)
-
-    # Nothing to output
-    raise dash.exceptions.PreventUpdate
 
 
 # -- Clientside callbacks

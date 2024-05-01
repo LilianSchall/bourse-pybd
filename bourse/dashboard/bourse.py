@@ -10,14 +10,14 @@ import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.graph_objects as go
 import sqlalchemy
-from dash import ClientsideFunction, Patch, clientside_callback, ctx, dcc, html
+from dash import ClientsideFunction, clientside_callback, ctx, dcc, html
 from dash.dependencies import ALL, MATCH, Input, Output, State
 from dateutil.relativedelta import relativedelta
 
 external_stylesheets = [dbc.themes.BOOTSTRAP]
 
-# DATABASE_URI = "timescaledb://ricou:monmdp@db:5432/bourse"  # inside docker
-DATABASE_URI = "timescaledb://ricou:monmdp@localhost:5432/bourse"  # outisde docker
+DATABASE_URI = "timescaledb://ricou:monmdp@db:5432/bourse"  # inside docker
+# DATABASE_URI = "timescaledb://ricou:monmdp@localhost:5432/bourse"  # outisde docker
 engine = sqlalchemy.create_engine(DATABASE_URI)
 
 # CUSTOM FOR INFRASTRUCTURE
@@ -156,10 +156,6 @@ columnDefs = [
         valueFormatter=dict(function="d3.format('(.2f')(params.value)"),
     ),
 ]
-
-# Fetch all markets from the database
-query = "SELECT id, alias FROM markets"
-MARKETS = pd.read_sql_query(query, engine)
 
 # Empty dataframe to store the companies and their symbols
 COMPANIES = pd.DataFrame(columns=["id", "name", "symbol"])
@@ -345,36 +341,24 @@ app.layout = html.Div(
                     [
                         html.Div(
                             [
-                                html.H4("Market Selection"),
-                                dcc.Dropdown(
+                                html.Div(
                                     [
-                                        {
-                                            "label": html.Span(
-                                                [
-                                                    html.Img(
-                                                        src=f"assets/graph_selection/markets/{ALIAS_TO_COUNTRY[markets['alias']]}.svg",
-                                                        height=30,
-                                                        style={
-                                                            "display": "inline-block",
-                                                        },
-                                                    ),
-                                                    html.Span(
-                                                        markets["alias"],
-                                                        style={
-                                                            "font-size": 15,
-                                                            "padding-left": 10,
-                                                        },
-                                                    ),
-                                                ],
-                                                style={
-                                                    "align-items": "center",
-                                                    "justify-content": "center",
-                                                },
-                                            ),
-                                            "value": markets["id"],
-                                        }
-                                        for _, markets in MARKETS.iterrows()
+                                        html.H4("Market Selection"),
+                                        html.Button(
+                                            [
+                                                html.Img(
+                                                    src="assets/graph_selection/sync.svg",
+                                                    className="m-auto",
+                                                ),
+                                            ],
+                                            id="market-selection-sync",
+                                            className="hoverable-btn",
+                                        ),
                                     ],
+                                    className="d-flex justify-content-between",
+                                ),
+                                dcc.Dropdown(
+                                    [],
                                     id="market-selection",
                                 ),
                             ],
@@ -421,25 +405,6 @@ app.layout = html.Div(
 
 
 # -- Functions
-def get_aggrid_data():
-    global DAYSTOCKS
-
-    if DAYSTOCKS.empty:
-        return []
-
-    aggrid_df = DAYSTOCKS.copy()
-    aggrid_df.reset_index(inplace=True)
-
-    # Add change column
-    aggrid_df["change"] = (aggrid_df["close"] - aggrid_df["open"]) / aggrid_df["open"]
-
-    # Add mean column
-    aggrid_df["mean"] = aggrid_df["close"].rolling(3).mean()
-
-    # Add std_dev column
-    aggrid_df["std_dev"] = aggrid_df["close"].rolling(3).std()
-
-    return aggrid_df.to_dict("records")
 
 
 def fig_contains_symbol_trace(fig, symbol):
@@ -556,7 +521,7 @@ def add_new_stock(fig, symbol):
     daystocks_query_df["symbol"] = symbol
 
     # Concatenate the new stocks with the existing ones
-    STOCKS = pd.concat([STOCKS, stocks_query_df], axis=1).sort_index()
+    STOCKS = pd.concat([STOCKS, stocks_query_df], axis=0).sort_index()
 
     # Concatenate the new daystocks with the existing ones
     DAYSTOCKS = pd.concat([DAYSTOCKS, daystocks_query_df], axis=0).sort_index()
@@ -646,11 +611,58 @@ def create_company_details(company, company_index, symbols):
 
 # -- Callbacks
 @app.callback(
+    Output("market-selection", "options"),
+    Input("market-selection-sync", "n_clicks"),
+)
+def update_market_selection(*args):
+    global MARKETS
+
+    # Fetch all markets from the database
+    try:
+        query = "SELECT id, alias FROM markets"
+        MARKETS = pd.read_sql_query(query, engine)
+    except Exception:
+        MARKETS = pd.DataFrame()
+
+    if MARKETS.empty:
+        return []
+
+    options = [
+        {
+            "label": html.Span(
+                [
+                    html.Img(
+                        src=f"assets/graph_selection/markets/{ALIAS_TO_COUNTRY[markets['alias']]}.svg",
+                        height=30,
+                        style={
+                            "display": "inline-block",
+                        },
+                    ),
+                    html.Span(
+                        markets["alias"],
+                        style={
+                            "font-size": 15,
+                            "padding-left": 10,
+                        },
+                    ),
+                ],
+                style={
+                    "align-items": "center",
+                    "justify-content": "center",
+                },
+            ),
+            "value": markets["id"],
+        }
+        for _, markets in MARKETS.iterrows()
+    ]
+    return options
+
+
+@app.callback(
     Output("input-company", "disabled"),
     Output("input-company", "value"),
     Input("market-selection", "value"),
     Input("graph-option-trash-can", "n_clicks"),
-    prevent_initial_call=True,
 )
 def disable_input_company(market_id, trash_can_clicks):
     reset_input = market_id is None or trash_can_clicks is not None
@@ -883,7 +895,35 @@ def update_graph_polyline(
     prevent_initial_call=True,
 )
 def update_table_data(*arg):
-    return get_aggrid_data()
+    global DAYSTOCKS, SELECTED_SYMBOLS
+
+    if DAYSTOCKS.empty or not SELECTED_SYMBOLS:
+        return []
+
+    # remove symbols that are not visible in the graph
+    aggrid_df = DAYSTOCKS[DAYSTOCKS["symbol"].isin(SELECTED_SYMBOLS)].copy()
+    aggrid_df.sort_index(inplace=True)
+
+    for symbol in SELECTED_SYMBOLS:
+        # Compute change column
+        aggrid_df.loc[aggrid_df["symbol"] == symbol, "change"] = (
+            aggrid_df.loc[aggrid_df["symbol"] == symbol, "close"]
+            - aggrid_df.loc[aggrid_df["symbol"] == symbol, "open"]
+        ) / aggrid_df.loc[aggrid_df["symbol"] == symbol, "open"]
+
+        # Compute mean column
+        aggrid_df.loc[aggrid_df["symbol"] == symbol, "mean"] = (
+            (aggrid_df.loc[aggrid_df["symbol"] == symbol, "close"]).rolling(3).mean()
+        )
+
+        # Compute std_dev column
+        aggrid_df.loc[aggrid_df["symbol"] == symbol, "std_dev"] = (
+            (aggrid_df.loc[aggrid_df["symbol"] == symbol, "close"]).rolling(3).std()
+        )
+
+    aggrid_df.reset_index(inplace=True)
+
+    return aggrid_df.to_dict("records")
 
 
 @app.callback(

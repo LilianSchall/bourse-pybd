@@ -168,7 +168,6 @@ fixed_dates = ["1D", "5D", "1M", "3M", "6M", "YTD", "1Y", "5Y", "ALL"]
 navbar_options_svg = ["night-mode", "full-screen"]
 
 graph_options_svg = [
-    "bx-cross",
     "candles",
     "polyline",
     "area-chart",

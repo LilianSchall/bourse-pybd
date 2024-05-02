@@ -947,9 +947,13 @@ def update_table_data(*arg):
     for symbol in SELECTED_SYMBOLS:
         # Compute change column
         aggrid_df.loc[aggrid_df["symbol"] == symbol, "change"] = (
-            aggrid_df.loc[aggrid_df["symbol"] == symbol, "close"]
-            - aggrid_df.loc[aggrid_df["symbol"] == symbol, "open"]
-        ) / aggrid_df.loc[aggrid_df["symbol"] == symbol, "open"]
+            (
+                aggrid_df.loc[aggrid_df["symbol"] == symbol, "close"]
+                - aggrid_df.loc[aggrid_df["symbol"] == symbol, "open"]
+            )
+            / aggrid_df.loc[aggrid_df["symbol"] == symbol, "open"]
+            * 100
+        )
 
         # Compute mean column
         aggrid_df.loc[aggrid_df["symbol"] == symbol, "mean"] = (

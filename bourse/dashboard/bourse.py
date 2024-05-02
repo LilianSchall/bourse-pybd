@@ -168,7 +168,6 @@ fixed_dates = ["1D", "5D", "1M", "3M", "6M", "YTD", "1Y", "5Y", "ALL"]
 navbar_options_svg = ["night-mode", "full-screen"]
 
 graph_options_svg = [
-    "bx-cross",
     "candles",
     "polyline",
     "area-chart",
@@ -854,12 +853,20 @@ def update_graph_polyline(
 
         if next(iter(symbols)) not in SELECTED_SYMBOLS:
             # Remove all traces of the unchecked symbols
-            fig.update_traces(
-                visible=False,
-                selector=lambda trace: any(
-                    symbol in trace["name"] for symbol in symbols
-                ),
-            )
+            traces = fig.to_dict().get("data", [])
+
+            trace_names = [trace.get("name") for trace in traces]
+            d_index = []
+            for symbol in symbols:
+                d_index += [
+                    idx for idx, tname in enumerate(trace_names) if symbol in tname
+                ]
+
+            for i in sorted(d_index, reverse=True):
+                traces.pop(i)
+
+            # Update the figure
+            fig = go.Figure(data=traces, layout=fig.layout)
         else:
             for symbol in symbols:
                 if symbol not in STOCKS.columns:
@@ -948,9 +955,13 @@ def update_table_data(*arg):
     for symbol in SELECTED_SYMBOLS:
         # Compute change column
         aggrid_df.loc[aggrid_df["symbol"] == symbol, "change"] = (
-            aggrid_df.loc[aggrid_df["symbol"] == symbol, "close"]
-            - aggrid_df.loc[aggrid_df["symbol"] == symbol, "open"]
-        ) / aggrid_df.loc[aggrid_df["symbol"] == symbol, "open"]
+            (
+                aggrid_df.loc[aggrid_df["symbol"] == symbol, "close"]
+                - aggrid_df.loc[aggrid_df["symbol"] == symbol, "open"]
+            )
+            / aggrid_df.loc[aggrid_df["symbol"] == symbol, "open"]
+            * 100
+        )
 
         # Compute mean column
         aggrid_df.loc[aggrid_df["symbol"] == symbol, "mean"] = (

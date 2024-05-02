@@ -48,5 +48,5 @@ ADD apps.tgz .
 
 # Finally, run gunicorn.
 #CMD echo $PYTHONPATH; python3 bourse.py
-CMD [ "gunicorn", "--timeout=300", "--workers=5", "--threads=1", "-b 0.0.0.0:8050", "bourse:server"]
+CMD [ "gunicorn", "--timeout=300", "--workers=1", "--threads=1", "-b 0.0.0.0:8050", "bourse:server"]
 

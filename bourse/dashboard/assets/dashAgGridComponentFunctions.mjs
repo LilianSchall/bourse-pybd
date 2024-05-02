@@ -19,6 +19,7 @@ dagcomponentfuncs.stockLink = function (props) {
         'a',
         {
             href: 'https://boursorama.com/cours/' + symbol,
+            target: '_blank',
             style: {
                 color: "#007BFF",
                 textDecoration: "none",

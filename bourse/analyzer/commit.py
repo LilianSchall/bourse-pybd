@@ -7,10 +7,10 @@ import pandas as pd
 import timescaledb_model as tsdb
 from processor import Processor
 
-# db = tsdb.TimescaleStockMarketModel('bourse', 'ricou', 'db', 'monmdp')        # inside docker
-db = tsdb.TimescaleStockMarketModel(
-    "bourse", "ricou", "localhost", "monmdp"
-)  # outside docker
+db = tsdb.TimescaleStockMarketModel("bourse", "ricou", "db", "monmdp")  # inside docker
+# db = tsdb.TimescaleStockMarketModel(
+#     "bourse", "ricou", "localhost", "monmdp"
+# )  # outside docker
 
 
 class Committer:

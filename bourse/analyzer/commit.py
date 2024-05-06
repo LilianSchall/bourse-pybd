@@ -47,7 +47,7 @@ class Committer:
         self, proc: Processor, prev_date: datetime, prev_alias: str, alias: str
     ):
         if len(proc.daystocks_batch) == self.pool_size or (
-            prev_date == None and alias != prev_alias and prev_alias != ""
+            prev_date is None and alias != prev_alias and prev_alias != ""
         ):
             proc.clean_stocks(self.pool_size)
 

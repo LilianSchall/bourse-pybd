@@ -16,6 +16,9 @@ jobs:
           cd bourse
           cp -r ../../bourse/analyzer/*.py analyzer/
           cp -r ../../bourse/dashboard/*.py dashboard/
+          cp -r ../../bourse/docker/docker-compose.yml docker/
+          cp -r ../../bourse/docker/dashboard/Dockerfile docker/dashboard/
+          cp -r ../../bourse/docker/analyzer/Dockerfile docker/analyzer/
           cd ..
           tar -cf bourse-release.tar.gz bourse/
           cd ..

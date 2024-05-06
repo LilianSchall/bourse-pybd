@@ -35,7 +35,7 @@ def store_file(filepath, nb_companies, prev_date, prev_alias):
     df["mid"] = market.iloc[0]["id"]
     df["date"] = date
 
-    if date.date() != prev_date and prev_date != None:
+    if date.date() != prev_date and prev_date is not None:
         processor.process_daystocks(prev_date)
 
     committer.commit_if_needed(processor, prev_date, prev_alias, alias)

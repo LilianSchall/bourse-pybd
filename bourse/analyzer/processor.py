@@ -99,7 +99,9 @@ class Processor:
 
         selected_columns = ["cid", "volume", "value", "day"]
         df1 = stocks[
-            stocks[selected_columns].ne(stocks[selected_columns].shift(1)).any(axis=1)
+            stocks[selected_columns]
+                .ne(stocks[selected_columns]
+                .shift(1)).any(axis=1)
         ]
         df2 = stocks[
             stocks[selected_columns].ne(stocks[selected_columns].shift(-1)).any(axis=1)

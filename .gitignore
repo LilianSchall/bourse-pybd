@@ -1,3 +1,6 @@
+# apps archive
+*.tgz
+
 # Bourse data
 bourse/docker/bourse/data/
 

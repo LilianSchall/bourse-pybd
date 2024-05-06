@@ -32,3 +32,10 @@ services:
       - boursenet
     volumes:
       - ${PWD}/bourse/data:/home/bourse/data/
+
+  dashboard:
+    image: my_dashboard
+    networks:
+      - boursenet
+    ports:
+      - "8050:8050"

@@ -326,8 +326,12 @@ app.layout = html.Div(
                                     dashGridOptions={
                                         "pagination": True,
                                         "paginationPageSize": 20,
+                                        "suppressHorizontalScroll": True,
                                     },
-                                    style={"height": "100%", "width": "100%"},
+                                    style={
+                                        "height": "100%",
+                                        "width": "100%",
+                                    },
                                 )
                             ],
                             id="table-content",
@@ -450,6 +454,22 @@ def fig_contains_symbol_trace(fig, symbol):
     return False
 
 
+def remove_traces(fig, symbols):
+    """Remove traces of given symbols from the figure"""
+    traces = fig.to_dict().get("data", [])
+
+    trace_names = [trace.get("name") for trace in traces]
+    d_index = []
+    for symbol in symbols:
+        d_index += [idx for idx, tname in enumerate(trace_names) if symbol in tname]
+
+    for i in sorted(d_index, reverse=True):
+        traces.pop(i)
+
+    # Update the figure
+    return go.Figure(data=traces, layout=fig.layout)
+
+
 def add_all_traces(fig, symbol):
     # - Add the symbol polyline trace to the figure
     fig.add_trace(
@@ -522,9 +542,8 @@ def add_all_traces(fig, symbol):
     return fig
 
 
-def add_new_stock(fig, symbol):
-    global STOCKS, DAYSTOCKS
-
+def update_symbol_data(fig, symbol):
+    global COMPANIES, STOCKS, DAYSTOCKS
     # Get company id from COMPANIES
     cid = COMPANIES.loc[COMPANIES["symbol"] == symbol, "id"].values[0]
 
@@ -556,11 +575,51 @@ def add_new_stock(fig, symbol):
     # Add symbol column to daystocks
     daystocks_query_df["symbol"] = symbol
 
-    # Concatenate the new stocks with the existing ones
-    STOCKS = pd.concat([STOCKS, stocks_query_df], axis=0).sort_index()
+    # Update the data
+    if symbol not in STOCKS.columns:
+        # Concatenate the new stocks + daystocks with the existing ones
+        STOCKS = pd.concat([STOCKS, stocks_query_df], axis=0).sort_index()
+        DAYSTOCKS = pd.concat([DAYSTOCKS, daystocks_query_df], axis=0).sort_index()
+    else:
+        # -- Update the stock data
+        old = STOCKS
+        new = stocks_query_df
+        merge = old.join(new[symbol], how="outer", lsuffix="_old")
+        merge.fillna({symbol: merge[f"{symbol}_old"]}, inplace=True)
+        merge.drop(columns=[f"{symbol}_old"], inplace=True)
+        STOCKS = merge
 
-    # Concatenate the new daystocks with the existing ones
-    DAYSTOCKS = pd.concat([DAYSTOCKS, daystocks_query_df], axis=0).sort_index()
+        # -- Update the daystock data
+        old = DAYSTOCKS
+        new = daystocks_query_df
+        tmp = old.loc[old["symbol"] == symbol]
+        merge = tmp.join(new, how="outer", lsuffix="_old")
+        merge.fillna(
+            {
+                "open": merge["open_old"],
+                "high": merge["high_old"],
+                "low": merge["low_old"],
+                "close": merge["close_old"],
+                "volume": merge["volume_old"],
+                "symbol": merge["symbol_old"],
+            },
+            inplace=True,
+        )
+        merge.drop(
+            columns=[
+                "open_old",
+                "high_old",
+                "low_old",
+                "close_old",
+                "volume_old",
+                "symbol_old",
+            ],
+            inplace=True,
+        )
+        tmp = old[old["symbol"] != symbol]
+        merge = pd.concat([tmp, merge], axis=0).sort_index()
+        DAYSTOCKS = merge
+        fig = remove_traces(fig, [symbol])
 
     fig = add_all_traces(fig, symbol)
     return fig
@@ -853,27 +912,11 @@ def update_graph_polyline(
 
         if next(iter(symbols)) not in SELECTED_SYMBOLS:
             # Remove all traces of the unchecked symbols
-            traces = fig.to_dict().get("data", [])
-
-            trace_names = [trace.get("name") for trace in traces]
-            d_index = []
-            for symbol in symbols:
-                d_index += [
-                    idx for idx, tname in enumerate(trace_names) if symbol in tname
-                ]
-
-            for i in sorted(d_index, reverse=True):
-                traces.pop(i)
-
-            # Update the figure
-            fig = go.Figure(data=traces, layout=fig.layout)
+            fig = remove_traces(fig, symbols)
         else:
             for symbol in symbols:
-                if symbol not in STOCKS.columns:
-                    # Fetch the stock data from the database and add it to the figure
-                    fig = add_new_stock(fig, symbol)
-                elif not fig_contains_symbol_trace(fig, symbol):
-                    fig = add_all_traces(fig, symbol)
+                # Update all data for the symbol + add all corresponding traces
+                fig = update_symbol_data(fig, symbol)
 
                 is_poly_visible = (
                     polyline_clicks is not None and polyline_clicks % 2 == 1

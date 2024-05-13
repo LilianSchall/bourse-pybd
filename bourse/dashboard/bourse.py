@@ -165,8 +165,6 @@ DAYSTOCKS, STOCKS = pd.DataFrame(), pd.DataFrame()
 
 fixed_dates = ["1D", "5D", "1M", "3M", "6M", "YTD", "1Y", "5Y", "ALL"]
 
-navbar_options_svg = ["night-mode", "full-screen"]
-
 graph_options_svg = [
     "candles",
     "polyline",
@@ -192,16 +190,6 @@ app.layout = html.Div(
                     [
                         html.Div(
                             [
-                                html.Button(
-                                    [
-                                        html.Img(
-                                            src="assets/header/night-mode.svg",
-                                            className="svg-size-24 m-auto",
-                                        ),
-                                    ],
-                                    id="navbar-option-night-mode",
-                                    className="navbar-btn hoverable-btn",
-                                ),
                                 html.Button(
                                     [
                                         html.Img(
@@ -1064,7 +1052,7 @@ def save_graph(fig, *args):
 
 clientside_callback(
     ClientsideFunction(namespace="clientside", function_name="toggle_full_screen"),
-    Output("navbar-option-night-mode", "n_clicks"),
+    Output("navbar-option-full-screen", "n_clicks"),
     Input("navbar-option-full-screen", "n_clicks"),
     prevent_initial_call=True,
 )

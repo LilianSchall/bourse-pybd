@@ -8,10 +8,13 @@ class Processor:
         process, clean and compress them.
     """
     def __init__(self, log):
+        # This will be our batch lists.
+        # each batch is composed of a number of dataframes
         self.stocks_batch = []
         self.day_batch = []
         self.daystocks_batch = []
         self.companies_batch = []
+        # This dataframe stores every companies that have been already processed
         self.companies_save: None | pd.DataFrame = None
         self.log = log
 
@@ -45,7 +48,6 @@ class Processor:
 
             # saving new companies
             self.companies_save = pd.concat([self.companies_save, new_companies])
-            # db.df_write(new_companies, "companies")
             # return updated list of companies
             return new_companies, nb_companies + len(new_companies)
 
@@ -78,7 +80,7 @@ class Processor:
             @param df: the dataframe to process
             @param nb_companies: the number of companies processed
         """
-        # companies, stocks, daystocks, file_done, tags
+        # companies, stocks, daystocks, ~~file_done~~, ~~tags~~
         companies, nb_companies = self.__process_companies(df, nb_companies)
         stocks = self.__process_stocks(df)
 

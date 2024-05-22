@@ -459,25 +459,27 @@ def remove_traces(fig, symbols):
 
 
 def add_all_traces(fig, symbol):
+    symbol_stocks = STOCKS[symbol]
     # - Add the symbol polyline trace to the figure
     fig.add_trace(
         go.Scatter(
-            x=STOCKS.index,
-            y=STOCKS[symbol],
+            x=symbol_stocks.index,
+            y=symbol_stocks,
             mode="lines",
             name=symbol,
             visible=False,
         )
     )
 
+    symbol_daystocks = DAYSTOCKS[DAYSTOCKS["symbol"] == symbol]
     # - Add the symbol candlestick trace to the figure
     fig.add_trace(
         go.Candlestick(
-            x=DAYSTOCKS.index,
-            open=DAYSTOCKS[DAYSTOCKS["symbol"] == symbol]["open"],
-            close=DAYSTOCKS[DAYSTOCKS["symbol"] == symbol]["close"],
-            high=DAYSTOCKS[DAYSTOCKS["symbol"] == symbol]["high"],
-            low=DAYSTOCKS[DAYSTOCKS["symbol"] == symbol]["low"],
+            x=symbol_daystocks.index,
+            open=symbol_daystocks["open"],
+            close=symbol_daystocks["close"],
+            high=symbol_daystocks["high"],
+            low=symbol_daystocks["low"],
             name=symbol,
             visible=False,
         )
@@ -485,15 +487,13 @@ def add_all_traces(fig, symbol):
 
     # - Add the symbol bollinger trace to the figure
     WINDOW = 30
-    sma_df = DAYSTOCKS[DAYSTOCKS["symbol"] == symbol]["close"].rolling(WINDOW).mean()
-    std_df = (
-        DAYSTOCKS[DAYSTOCKS["symbol"] == symbol]["close"].rolling(WINDOW).std(ddof=0)
-    )
+    sma_df = symbol_daystocks["close"].rolling(WINDOW).mean()
+    std_df = symbol_daystocks["close"].rolling(WINDOW).std(ddof=0)
 
     # Moving Average
     fig.add_trace(
         go.Scatter(
-            x=DAYSTOCKS.index,
+            x=symbol_daystocks.index,
             y=sma_df,
             line_color="black",
             name=f"bollinger-{symbol}",
@@ -504,7 +504,7 @@ def add_all_traces(fig, symbol):
     # Upper Bound
     fig.add_trace(
         go.Scatter(
-            x=DAYSTOCKS.index,
+            x=symbol_daystocks.index,
             y=sma_df + (std_df * 2),
             line_color="gray",
             line={"dash": "dash"},
@@ -517,7 +517,7 @@ def add_all_traces(fig, symbol):
     # Lower Bound fill in between with parameter 'fill': 'tonexty'
     fig.add_trace(
         go.Scatter(
-            x=DAYSTOCKS.index,
+            x=symbol_daystocks.index,
             y=sma_df - (std_df * 2),
             line_color="gray",
             line={"dash": "dash"},

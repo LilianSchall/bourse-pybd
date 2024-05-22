@@ -1,4 +1,4 @@
-FROM python:3-bookworm
+FROM reg.undercloud.cri.epita.fr/docker/python:3-bookworm
 #FROM ubuntu:latest
 MAINTAINER Olivier Ricou <olivier@ricou.eu.org>
 

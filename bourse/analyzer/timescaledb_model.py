@@ -30,10 +30,16 @@ class TimescaleStockMarketModel:
         self.__port = port or 5432
         self.__password = password or ''
         self.__squash = False
-        self.__connection = psycopg2.connect(database=self.__database,
-                                             user=self.__user,
-                                             host=self.__host,
-                                             password=self.__password)
+        while True:
+            try:
+                self.__connection = psycopg2.connect(database=self.__database,
+                                                     user=self.__user,
+                                                     host=self.__host,
+                                                     password=self.__password)
+                break
+            except:
+                pass
+
         self.__engine = sqlalchemy.create_engine(f'timescaledb://{self.__user}:{self.__password}@{self.__host}:{self.__port}/{self.__database}')
         self.__nf_cid = {}  # cid from netfonds symbol
         self.__boursorama_cid = {}  # cid from netfonds symbol

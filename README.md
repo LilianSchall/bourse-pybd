@@ -8,13 +8,21 @@ french software engineering school EPITA.
 - [Data to process](https://www.lrde.epita.fr/~ricou/pybd/projet/boursorama.tar)
 
 ## What you need to do to run the project
-In a shell at the root of the repository, do the following commands:
-```bash
-(cd bourse/docker/analyzer && make fast);
-(cd bourse/docker/dashboard && make fast);
-(mkdir data && cd data && 
-wget https://www.lrde.epita.fr/~ricou/pybd/projet/boursorama.tar &&
-tar -xf boursorama.tar &&
-mv boursorama.tar ..);
-docker compose -f bourse/docker/docker-compose.yml up;
+
+Firstly, your first action would be to clone the boursorama tarball 
+and build the two docker images (for the analyzer and the dashboard).
+
+The tarball will be decompressed into the temporary /srv/libvirt-workdir/ folder
+The docker compose file has already been correctly configured
+so that the bind linked to the analyzer reaches the correct folder.
+
+The setup can be done through the following command:
+```shell
+    make setup
+```
+
+Afterwards, you would like to run the docker stack.
+This can be done through the following command:
+```shell
+    make run
 ```

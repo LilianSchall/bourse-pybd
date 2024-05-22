@@ -67,6 +67,12 @@ def process_files(dir, nb_companies=0, nb_files_processed=0, previous_alias=""):
                                that has been processed
     """
     log.debug(dir)
+    # we walk each directory and
+    # call recursively this function for each directory
+    # if we land on a file, we process this file
+    # we process them on the alphabetical ascending order
+    # because we'd like to process every file of a trading day
+    # (this will be our batch to commit)
     for root, dirs, files in os.walk(dir):
         prev_date = None
         for file in sorted(files):

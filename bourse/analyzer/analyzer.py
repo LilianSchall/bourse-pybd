@@ -17,6 +17,11 @@ committer = Committer(log)
 
 
 def compute_alias_date(filename: str):
+    """
+        Compute the market alias from the filename 
+        along with the date of snapshot
+        @param filename: the name of the file to process
+    """
     alias = filename.split()[0]
     date_str = filename[:-4].replace(alias + " ", "")
     date: datetime = dateutil.parser.parse(date_str)
@@ -24,6 +29,14 @@ def compute_alias_date(filename: str):
 
 
 def store_file(filepath, nb_companies, prev_date, prev_alias):
+    """
+        Process and store a file into the database through a batch process
+        @param filepath: the path of the file to process
+        @param nb_companies: the number of companies
+        @param prev_date: the date of the previous file that has been processed
+        @param prev_alias: the market alias of the previous file
+                           that has been processed
+    """
     filename = os.path.basename(filepath)
     # if db.is_file_done(filename):
     #    log.debug("File has already been processed")
@@ -45,6 +58,14 @@ def store_file(filepath, nb_companies, prev_date, prev_alias):
 
 
 def process_files(dir, nb_companies=0, nb_files_processed=0, previous_alias=""):
+    """
+        Run through a directory and process all files into the database
+        @param dir: the path to the dir to process
+        @param nb_companies: the number of companies already processed
+        @param nb_files_processed: the number of files already processed
+        @param previous_alias: the market alias of the previous file
+                               that has been processed
+    """
     log.debug(dir)
     for root, dirs, files in os.walk(dir):
         prev_date = None

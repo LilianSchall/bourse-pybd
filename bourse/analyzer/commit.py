@@ -5,6 +5,7 @@ from multiprocessing import get_context
 
 import pandas as pd
 import timescaledb_model as tsdb
+
 from processor import Processor
 
 db = tsdb.TimescaleStockMarketModel("bourse", "ricou", "db", "monmdp")  # inside docker
@@ -14,6 +15,10 @@ db = tsdb.TimescaleStockMarketModel("bourse", "ricou", "db", "monmdp")  # inside
 
 
 class Committer:
+    """
+        The committer is used to commit processed DataFrame to the database
+        efficiently through a processpool.
+    """
     @staticmethod
     def commit_companies(df: pd.DataFrame):
         db.df_write(df, "companies")
@@ -46,6 +51,14 @@ class Committer:
     def commit_if_needed(
         self, proc: Processor, prev_date: datetime, prev_alias: str, alias: str
     ):
+        """
+            Commit the processed dataframes if we have a full batch into the database.
+
+            @param proc: a stock processor
+            @param prev_date: the date of the previous file that has been processed
+            @param prev_alias: the market alias of the previous file that has been processed
+            @param alias: the current market alias to store
+        """
         if len(proc.daystocks_batch) == self.pool_size or (
             prev_date is None and alias != prev_alias and prev_alias != ""
         ):

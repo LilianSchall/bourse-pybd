@@ -459,7 +459,7 @@ def remove_traces(fig, symbols):
 
 
 def add_all_traces(fig, symbol):
-    symbol_stocks = STOCKS[symbol]
+    symbol_stocks = STOCKS[symbol].sort_index()
     # - Add the symbol polyline trace to the figure
     fig.add_trace(
         go.Scatter(
@@ -471,7 +471,7 @@ def add_all_traces(fig, symbol):
         )
     )
 
-    symbol_daystocks = DAYSTOCKS[DAYSTOCKS["symbol"] == symbol]
+    symbol_daystocks = DAYSTOCKS[DAYSTOCKS["symbol"] == symbol].sort_index()
     # - Add the symbol candlestick trace to the figure
     fig.add_trace(
         go.Candlestick(

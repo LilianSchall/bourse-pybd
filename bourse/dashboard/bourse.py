@@ -575,7 +575,7 @@ def update_symbol_data(fig, symbol):
         merge = old.join(new[symbol], how="outer", lsuffix="_old")
         merge.fillna({symbol: merge[f"{symbol}_old"]}, inplace=True)
         merge.drop(columns=[f"{symbol}_old"], inplace=True)
-        STOCKS = merge
+        STOCKS = merge.sort_index()
 
         # -- Update the daystock data
         old = DAYSTOCKS
@@ -605,8 +605,8 @@ def update_symbol_data(fig, symbol):
             inplace=True,
         )
         tmp = old[old["symbol"] != symbol]
-        merge = pd.concat([tmp, merge], axis=0).sort_index()
-        DAYSTOCKS = merge
+        merge = pd.concat([tmp, merge], axis=0)
+        DAYSTOCKS = merge.sort_index()
         fig = remove_traces(fig, [symbol])
 
     fig = add_all_traces(fig, symbol)

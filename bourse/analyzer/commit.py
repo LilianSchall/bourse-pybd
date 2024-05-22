@@ -59,9 +59,14 @@ class Committer:
             @param prev_alias: the market alias of the previous file that has been processed
             @param alias: the current market alias to store
         """
+        # if we have enough daystocks processed in our batch so that
+        # each process will commit one daystock
+        # we commit all batches to database and then reset the batches
         if len(proc.daystocks_batch) == self.pool_size or (
             prev_date is None and alias != prev_alias and prev_alias != ""
         ):
+            # we have to clean the stocks batches before committing
+            # so that we remove all duplicate values of a same day
             proc.clean_stocks(self.pool_size)
 
             self.log.debug(f"Committing {len(proc.stocks_batch)} files to db")

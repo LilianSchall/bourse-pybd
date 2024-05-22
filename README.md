@@ -7,6 +7,9 @@ french software engineering school EPITA.
 - [Archive reference](https://www.lrde.epita.fr/~ricou/pybd/projet/bourse.tgz)
 - [Data to process](https://www.lrde.epita.fr/~ricou/pybd/projet/boursorama.tar)
 
+## Note
+The analyzer takes approximately 3 hours to fill the database.
+
 ## What you need to do to run the project
 
 Firstly, your first action would be to clone the boursorama tarball 

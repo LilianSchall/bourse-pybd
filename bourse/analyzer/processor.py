@@ -3,6 +3,10 @@ import pandas as pd
 
 
 class Processor:
+    """
+        The Processor is used to load dataframes from files and
+        process, clean and compress them.
+    """
     def __init__(self, log):
         self.stocks_batch = []
         self.day_batch = []
@@ -12,6 +16,11 @@ class Processor:
         self.log = log
 
     def __process_companies(self, df: pd.DataFrame | pd.Series, nb_companies: int):
+        """
+            Process the dataframe and fill up the company table.
+            @param df: the dataframe to process
+            @param nb_companies: the number of companies processed
+        """
         df.drop("symbol", axis=1, inplace=True)
         df.dropna(inplace=True)
 
@@ -41,6 +50,10 @@ class Processor:
             return new_companies, nb_companies + len(new_companies)
 
     def __process_stocks(self, df: pd.DataFrame | pd.Series):
+        """
+            Process the dataframe and fill up the stocks table.
+            @param df: the dataframe to process
+        """
         stocks = df.reset_index().merge(
             self.companies_save.assign(cid=self.companies_save.index)[
                 ["symbol", "cid"]
@@ -59,6 +72,12 @@ class Processor:
         return stocks
 
     def process_dataframe(self, df: pd.DataFrame | pd.Series, nb_companies: int):
+        """
+            Process the dataframe of a file by extracting its data and put it
+            in the company and stocks table.
+            @param df: the dataframe to process
+            @param nb_companies: the number of companies processed
+        """
         # companies, stocks, daystocks, file_done, tags
         companies, nb_companies = self.__process_companies(df, nb_companies)
         stocks = self.__process_stocks(df)
@@ -70,6 +89,10 @@ class Processor:
         return nb_companies
 
     def process_daystocks(self, prev_date):
+        """
+            From the processed stocks batch, create a daystock out of it
+            @param prev_date: the date of the previous file processed.
+        """
         self.log.debug(f"Group by {len(self.day_batch)} for daystocks")
         daystocks = pd.concat(self.day_batch, ignore_index=False)
         daystocks = daystocks.groupby(["cid"]).agg(
@@ -90,6 +113,10 @@ class Processor:
         self.daystocks_batch = []
 
     def clean_stocks(self, pool_size):
+        """
+            Clean the stock batch by removing repeating stock values, so that
+            we store fewer value in database.
+        """
         stocks = pd.concat(self.stocks_batch, ignore_index=False)
 
         stocks.reset_index(inplace=True)

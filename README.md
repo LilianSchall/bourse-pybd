@@ -8,7 +8,11 @@ french software engineering school EPITA.
 - [Data to process](https://www.lrde.epita.fr/~ricou/pybd/projet/boursorama.tar)
 
 ## Note
-The analyzer takes approximately 3 hours to fill the database.
+1. The analyzer takes approximately 3 hours to fill the database.
+2. For the added functionality in the dashboard, we have implemented a group of features:
+   - Full screen mode for the Plotly graph
+   - The ability to choose specific fixed dates for the stock graph (1D, 5D, 1M, 3M, 6M, YTD, 1Y, 5Y, ALL)
+   - Percentage change of Daystocks in the table
 
 ## What you need to do to run the project
 

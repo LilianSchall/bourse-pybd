@@ -390,6 +390,7 @@ app.layout = html.Div(
         ),
         # -- Dummy hidden div
         html.Div(id="dummy-div", style={"display": "none"}),
+        html.Div(id="dummy-div-switch-market", style={"display": "none"}),
     ],
     className="app-container",
 )
@@ -566,7 +567,12 @@ def update_symbol_data(fig, symbol):
     # Update the data
     if symbol not in STOCKS.columns:
         # Concatenate the new stocks + daystocks with the existing ones
-        STOCKS = pd.concat([STOCKS, stocks_query_df], axis=0).sort_index()
+        STOCKS = (
+            pd.concat([STOCKS, stocks_query_df], axis=0)
+            .sort_index()
+            .infer_objects(copy=False)
+            .interpolate()
+        )
         DAYSTOCKS = pd.concat([DAYSTOCKS, daystocks_query_df], axis=0).sort_index()
     else:
         # -- Update the stock data
@@ -575,7 +581,7 @@ def update_symbol_data(fig, symbol):
         merge = old.join(new[symbol], how="outer", lsuffix="_old")
         merge.fillna({symbol: merge[f"{symbol}_old"]}, inplace=True)
         merge.drop(columns=[f"{symbol}_old"], inplace=True)
-        STOCKS = merge.sort_index()
+        STOCKS = merge.sort_index().infer_objects(copy=False).interpolate()
 
         # -- Update the daystock data
         old = DAYSTOCKS
@@ -744,33 +750,35 @@ def update_market_selection(*args):
 @app.callback(
     Output("input-company", "disabled"),
     Output("input-company", "value"),
+    Output("dummy-div-switch-market", "children"),
     Input("market-selection", "value"),
     Input("graph-option-trash-can", "n_clicks"),
 )
 def disable_input_company(market_id, *args):
-    global SELECTED_COMPANIES, SELECTED_SYMBOLS, COMPANIES
+    global SELECTED_COMPANIES, SELECTED_SYMBOLS, COMPANIES, STOCKS, DAYSTOCKS
     # Initial call
     if ctx.triggered_id is None:
-        return True, ""
+        return True, "", ""
     elif ctx.triggered_id == "graph-option-trash-can":
         SELECTED_COMPANIES, SELECTED_SYMBOLS = set(), set()
-        return market_id is None, ""
+        return market_id is None, "", ""
     else:
         SELECTED_COMPANIES, SELECTED_SYMBOLS = set(), set()
         if market_id is None:
             COMPANIES = pd.DataFrame(columns=["id", "name", "symbol"])
-            return True, ""
+            return True, "", ""
 
         # Query the database for the companies in the selected market
         query = f"SELECT id, name, symbol FROM companies WHERE mid = {market_id}"
-        df_query = pd.read_sql_query(query, engine)
-
-        # Concatenate the new companies with the existing ones
-        COMPANIES = pd.concat([COMPANIES, df_query], ignore_index=True)
+        COMPANIES = pd.read_sql_query(query, engine)
 
         # Remove duplicates on symbols
         COMPANIES.drop_duplicates(subset="symbol", inplace=True)
-        return False, ""
+
+        # Reset the stocks and daystocks dataframes
+        STOCKS, DAYSTOCKS = pd.DataFrame(), pd.DataFrame()
+
+        return False, "", ""
 
 
 @app.callback(
@@ -865,6 +873,7 @@ def toggle_lin_log_btn(*args):
     Input("lin-btn", "n_clicks"),
     Input("log-btn", "n_clicks"),
     Input({"type": "fixed-date-btn", "index": ALL}, "n_clicks"),
+    Input("dummy-div-switch-market", "children"),
     prevent_initial_call=True,
 )
 def update_graph_polyline(
@@ -948,7 +957,11 @@ def update_graph_polyline(
         fig.update_traces(
             visible=is_visible, selector=lambda trace: "bollinger" in trace["name"]
         )
-    elif ctx.triggered_id == "graph-option-trash-can":
+    elif (
+        ctx.triggered_id is None
+        or ctx.triggered_id == "graph-option-trash-can"
+        or ctx.triggered_id == "dummy-div-switch-market"
+    ):
         fig = go.Figure(layout=BASIC_FIG_LAYOUT)  # Reset graph
     elif "date-picker-range" == ctx.triggered_id and not start_date and not end_date:
         fig.update_layout(xaxis=dict(type="date", range=[MIN_DATE, MAX_DATE]))

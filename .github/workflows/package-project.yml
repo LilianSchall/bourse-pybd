@@ -19,8 +19,9 @@ jobs:
           cp -r ../../bourse/docker/docker-compose.yml docker/
           cp -r ../../bourse/docker/dashboard/Dockerfile docker/dashboard/
           cp -r ../../bourse/docker/analyzer/Dockerfile docker/analyzer/
+          rm docker/README
           cd ..
-          tar -cf bourse-release.tar.gz bourse/
+          tar -cf bourse-release.tar.gz bourse/ ../README.md ../Makefile
           cd ..
 
       - uses: "marvinpinto/action-automatic-releases@latest"

@@ -33,3 +33,8 @@ This can be done through the following command:
 ```shell
     make run
 ```
+
+Because of the infamously known bug of podman, you will need to run two times
+this command, since the analyzer will start too soon.
+This bug has been reported in one of the moodle discussion:
+(https://moodle.epita.fr/mod/forum/discuss.php?d=6855#p11745)

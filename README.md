@@ -38,3 +38,5 @@ This bug has been reported in one of the moodle discussion:
 (https://moodle.epita.fr/mod/forum/discuss.php?d=6855#p11745)
 
 > 🚨: In order to see some data in the dashboard, you will need to wait for the analyzer to make a first commit to the database. The first market that will be filled will be the `Amsterdam` one.
+
+> 🚨: For better frontend compatibility please open the dashboard in chrome (or chromium if you are evaluating with the school computers).
